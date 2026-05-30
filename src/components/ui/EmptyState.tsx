@@ -1,0 +1,49 @@
+import React from 'react';
+import Link from 'next/link';
+import { PackageOpen } from 'lucide-react';
+
+interface EmptyStateProps {
+  title?: string;
+  message?: string;
+  actionLabel?: string;
+  actionHref?: string;
+}
+
+/**
+ * Branded empty state shown when a page has no data to display.
+ */
+export default function EmptyState({
+  title = 'NOTHING HERE YET',
+  message = 'This section has no items at the moment. Check back soon.',
+  actionLabel,
+  actionHref,
+}: EmptyStateProps) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[40vh] gap-6 py-16 px-4 text-center">
+      {/* Icon */}
+      <div className="w-20 h-20 rounded-full bg-brand-charcoal border border-white/10 flex items-center justify-center">
+        <PackageOpen className="w-8 h-8 text-neutral-500" />
+      </div>
+
+      {/* Copy */}
+      <div className="space-y-2 max-w-xs">
+        <h3 className="font-display font-black text-sm tracking-widest text-white uppercase">
+          {title}
+        </h3>
+        <p className="text-xs text-neutral-500 font-sans font-light leading-relaxed tracking-wide">
+          {message}
+        </p>
+      </div>
+
+      {/* Optional action */}
+      {actionLabel && actionHref && (
+        <Link
+          href={actionHref}
+          className="text-[10px] tracking-widest font-display font-black text-brand-magenta border-b border-brand-magenta/40 pb-1 hover:border-brand-magenta transition-colors"
+        >
+          {actionLabel} →
+        </Link>
+      )}
+    </div>
+  );
+}
