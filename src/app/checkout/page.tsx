@@ -9,6 +9,7 @@ import WhatsAppAssist from '@/components/ui/WhatsAppAssist';
 import { ArrowLeft, Check, Lock, ShieldCheck, ShoppingBag, X, Clock, AlertTriangle } from 'lucide-react';
 import { initMercadoPago } from '@mercadopago/sdk-react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 
 const Payment = dynamic(
   () => import('@mercadopago/sdk-react').then((mod) => mod.Payment),
@@ -17,10 +18,12 @@ const Payment = dynamic(
 
 export default function CheckoutPage() {
   const { cart, cartTotal, clearCart } = useCart();
+  const router = useRouter();
 
   // Inputs state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
@@ -62,6 +65,7 @@ export default function CheckoutPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
         body: JSON.stringify({
           formData,
@@ -79,27 +83,25 @@ export default function CheckoutPage() {
             method: shippingMethod,
           },
           email,
+          phone,
         }),
       });
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        const rawText = await response.text().catch(() => '');
+        console.error('Failed to parse response JSON:', parseError, rawText);
+        throw new Error(`Server returned status ${response.status}: ${rawText.substring(0, 100) || response.statusText}`);
+      }
 
       if (!response.ok) {
         throw new Error(result.message || 'Payment processing failed');
       }
 
-      if (result.paymentStatus === 'approved') {
-        setPaymentStatusState('approved');
-        setOrderSecured(true);
-        clearCart();
-      } else if (result.paymentStatus === 'in_process' || result.paymentStatus === 'pending') {
-        setPaymentStatusState('pending');
-        setOrderSecured(true);
-        clearCart();
-      } else {
-        setPaymentStatusState('rejected');
-        alert(`Payment rejected. Please try another card or method. Status: ${result.paymentStatusDetail || 'rejected'}`);
-      }
+      clearCart();
+      router.push(`/checkout/result?orderId=${result.orderId}`);
     } catch (error: any) {
       console.error('Payment processing failed:', error);
       alert(`Error: ${error.message || 'An error occurred during payment. Please try again.'}`);
@@ -110,6 +112,29 @@ export default function CheckoutPage() {
 
   const shippingCost = shippingMethod === 'express' ? 250 : 0; // 250 MXN for express
   const checkoutTotal = cartTotal + shippingCost;
+
+  const initialization = React.useMemo(() => {
+    const amountVal = Number(checkoutTotal);
+    return {
+      amount: isNaN(amountVal) || amountVal <= 0 ? 1 : amountVal,
+      payer: {
+        email: email || 'guest@example.com',
+        entityType: 'individual' as const,
+      },
+    };
+  }, [checkoutTotal, email]);
+
+  const customization = React.useMemo(() => ({
+    paymentMethods: {
+      creditCard: 'all' as const,
+      debitCard: 'all' as const,
+    },
+    visual: {
+      style: {
+        theme: 'dark' as const,
+      },
+    },
+  }), []);
 
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,6 +279,20 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="space-y-1.5">
+                  <label htmlFor="checkout-phone" className="text-[10px] tracking-widest text-neutral-400 font-bold">PHONE NUMBER</label>
+                  <input
+                    id="checkout-phone"
+                    type="tel"
+                    required
+                    placeholder="e.g. 5555555555"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={isInfoConfirmed}
+                    className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
                   <label htmlFor="checkout-address" className="text-[10px] tracking-widest text-neutral-400 font-bold">THE DESTINATION</label>
                   <input
                     id="checkout-address"
@@ -362,8 +401,8 @@ export default function CheckoutPage() {
                   size="lg"
                   type="button"
                   onClick={() => {
-                    if (!name || !email || !address || !city || !zip) {
-                      alert('Please fill out all identity, email, and destination fields.');
+                    if (!name || !email || !phone || !address || !city || !zip) {
+                      alert('Please fill out all identity, email, phone, and destination fields.');
                       return;
                     }
                     if (!/\S+@\S+\.\S+/.test(email)) {
@@ -381,7 +420,7 @@ export default function CheckoutPage() {
               <div className="flex justify-between items-center p-4 border border-brand-magenta/30 bg-brand-magenta/5 rounded-xl">
                 <div className="text-left font-sans text-xs">
                   <p className="font-bold text-white uppercase tracking-wider">Info Confirmed</p>
-                  <p className="text-neutral-400 text-[10px] mt-0.5">{email} — {city}</p>
+                  <p className="text-neutral-400 text-[10px] mt-0.5">{email} — {phone} — {city}</p>
                 </div>
                 <button
                   type="button"
@@ -461,23 +500,8 @@ export default function CheckoutPage() {
                       <div className="p-4 bg-brand-charcoal border border-white/5 rounded-xl space-y-4">
                         <h4 className="text-[10px] tracking-widest text-neutral-400 font-bold uppercase">PAYMENT PARAMETERS</h4>
                         <Payment
-                          initialization={{
-                            amount: checkoutTotal,
-                            payer: {
-                              email: email,
-                            }
-                          }}
-                          customization={{
-                            paymentMethods: {
-                              creditCard: 'all',
-                              debitCard: 'all',
-                            },
-                            visual: {
-                              style: {
-                                theme: 'dark',
-                              }
-                            }
-                          }}
+                          initialization={initialization}
+                          customization={customization}
                           onSubmit={handlePaymentBrickSubmit}
                           onError={(error) => console.error('MercadoPago Brick Error:', error)}
                         />

@@ -78,8 +78,8 @@ To test the card forms without charging a real card, use Mercado Pago's official
 - **Test Cards**:
   | Card Issuer | Card Number | Expiration Date | Security Code (CVV) | Cardholder Name |
   | :--- | :--- | :--- | :--- | :--- |
-  | **Visa** | `4000 1234 5678 9010` | Any future date (e.g., `12/28`) | `123` | `APRO` (for Approved) or `CONT` (for Pending) or `OTHE` (for Rejected) |
-  | **Mastercard** | `5599 9999 9999 9999` | Any future date | `123` | `APRO` |
+  | **Visa (MX)** | `4075 5957 1648 3764` | Any future date (e.g., `12/28`) | `123` | `APRO` (for Approved) or `CONT` (for Pending) or `OTHE` (for Rejected) |
+  | **Mastercard (MX)** | `5474 9254 3267 0366` | Any future date | `123` | `APRO` |
 
 *Refer to the official [Mercado Pago Test Cards List](https://www.mercadopago.com.mx/developers/es/docs/checkout-bricks/payment-brick/integration-test/test-cards) for more mock cards.*
 

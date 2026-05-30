@@ -11,9 +11,13 @@ const BASE =
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    cache: 'no-store',
     ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+      ...opts?.headers,
+    },
+    cache: 'no-store',
   });
   if (!res.ok) {
     let msg = res.statusText;

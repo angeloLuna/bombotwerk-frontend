@@ -14,7 +14,10 @@ const BASE_URL =
 
 async function request<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE_URL}/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    },
     // Disable Next.js cache so we always get fresh data in dev
     cache: 'no-store',
   });

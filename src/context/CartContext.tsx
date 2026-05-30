@@ -88,7 +88,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCart([]);
   };
 
-  const cartTotal = cart.reduce((total, item) => total + item.product.price * item.quantity, 0);
+  const cartTotal = cart.reduce((total, item) => {
+    const price = typeof item.product.price === 'string'
+      ? parseFloat(item.product.price)
+      : Number(item.product.price);
+    const itemPrice = isNaN(price) ? 0 : price;
+    return total + itemPrice * item.quantity;
+  }, 0);
   const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
 
   return (
