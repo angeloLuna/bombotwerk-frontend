@@ -13,6 +13,16 @@ const Navigation: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Hide storefront header on admin and login pages
+  if (
+    pathname?.startsWith('/admin') ||
+    pathname?.startsWith('/login') ||
+    pathname?.startsWith('/unauthorized')
+  ) {
+    return null;
+  }
+
+
   const navLinks = [
     { name: 'INICIO', path: '/' },
     { name: 'TIENDA', path: '/shop' },

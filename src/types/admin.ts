@@ -164,3 +164,52 @@ export function productToForm(p: AdminProduct): ProductForm {
         : [defaultVariant()],
   };
 }
+
+export interface AdminOrderItem {
+  id: string;
+  productId: string | null;
+  productName: string | null;
+  variantName: string | null;
+  size: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface AdminPayment {
+  id: string;
+  provider: string;
+  providerPaymentId: string | null;
+  providerStatus: string | null;
+  status: string;
+  statusDetail: string | null;
+  amount: number;
+  currency: string;
+  paymentMethod: string | null;
+  createdAt: string;
+  updatedAt: string;
+  method?: string | null;
+  transactionId?: string | null;
+  rawResponse?: any;
+}
+
+export interface AdminOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string | null;
+  customerEmail: string | null;
+  customerPhone: string | null;
+  shippingAddress?: string | null;
+  billingAddress?: string | null;
+  shippingMethod?: string | null;
+  status: string;
+  subtotal: number;
+  shippingTotal: number;
+  total: number;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+  payment: AdminPayment | null;
+  items: AdminOrderItem[];
+}
+

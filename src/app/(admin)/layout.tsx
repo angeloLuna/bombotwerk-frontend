@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import {
   Package,
   Layers,
@@ -11,13 +12,22 @@ import {
   X,
   Zap,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 
-const NAV = [
+
+const NAV: Array<{
+  label: string;
+  href: string;
+  icon: any;
+  disabled?: boolean;
+}> = [
   { label: 'Products', href: '/admin/products', icon: Package },
   { label: 'Collections', href: '/admin/collections', icon: Layers },
-  { label: 'Orders', href: '/admin/orders', icon: ShoppingBag, disabled: true },
+  { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
 ];
+
+
 
 function Sidebar({
   pathname,
@@ -98,6 +108,7 @@ function Sidebar({
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { data: session } = useSession();
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex">
@@ -132,10 +143,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex-1" />
-          <span className="text-[10px] text-neutral-600 tracking-widest font-display">
-            ⚠ NO AUTH — INTERNAL USE ONLY
-          </span>
+          
+          {session?.user && (
+            <div className="flex items-center gap-4 text-xs">
+              {/* User profile */}
+              <div className="flex items-center gap-2">
+                {session.user.image && (
+                  <img
+                    src={session.user.image}
+                    alt={session.user.name || 'User'}
+                    className="w-5 h-5 rounded-full border border-white/10"
+                  />
+                )}
+                <span className="text-neutral-400 font-sans hidden sm:inline">
+                  {session.user.name || session.user.email}
+                </span>
+                <span className="text-[8px] bg-brand-magenta/10 text-brand-magenta px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                  {session.user.role}
+                </span>
+              </div>
+
+              {/* Logout action */}
+              <button
+                onClick={() => signOut({ callbackUrl: '/login' })}
+                className="flex items-center gap-1 text-neutral-500 hover:text-red-400 transition-colors font-display font-bold tracking-widest text-[9px]"
+                title="Cerrar sesión"
+              >
+                <LogOut className="w-3.5 h-3.5" /> <span className="hidden sm:inline">CERRAR SESIÓN</span>
+              </button>
+            </div>
+          )}
         </header>
+
 
         {/* Page content */}
         <main className="flex-1 px-4 md:px-8 py-8 max-w-7xl w-full mx-auto">

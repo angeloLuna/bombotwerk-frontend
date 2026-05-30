@@ -9,6 +9,8 @@ interface EmailReceiptPreviewProps {
     customerEmail: string | null;
     status: string;
     createdAt: string;
+    subtotal: number;
+    shippingTotal: number;
     total: number;
     currency: string;
     payment?: {
@@ -26,6 +28,7 @@ interface EmailReceiptPreviewProps {
     }>;
   };
 }
+
 
 export default function EmailReceiptPreview({ order }: EmailReceiptPreviewProps) {
   // Format payment status text

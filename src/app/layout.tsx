@@ -3,6 +3,7 @@ import { Outfit, Bebas_Neue, Playfair_Display, Orbitron, Syne } from 'next/font/
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import Navigation from '@/components/Navigation';
+import { SessionProvider } from 'next-auth/react';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -58,16 +59,19 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${outfit.variable} ${bebas.variable} ${playfair.variable} ${orbitron.variable} ${syne.variable} h-full`}>
       <body className="h-full bg-brand-dark text-white flex flex-col selection:bg-brand-magenta selection:text-black">
-        <CartProvider>
-          {/* Header & Nav */}
-          <Navigation />
+        <SessionProvider>
+          <CartProvider>
+            {/* Header & Nav */}
+            <Navigation />
 
-          {/* Main content with space for bottom navigation bar on mobile */}
-          <main className="flex-1 pb-20 md:pb-0">
-            {children}
-          </main>
-        </CartProvider>
+            {/* Main content with space for bottom navigation bar on mobile */}
+            <main className="flex-1 pb-20 md:pb-0">
+              {children}
+            </main>
+          </CartProvider>
+        </SessionProvider>
       </body>
     </html>
   );
 }
+
