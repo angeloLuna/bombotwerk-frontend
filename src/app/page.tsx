@@ -102,11 +102,27 @@ export default function HomePage() {
       {/* 1. HERO BANNER */}
       <section className="relative h-[100svh] w-full flex flex-col justify-end overflow-hidden">
         {/* Background Image with Dark Vignette and Gradient Overlays */}
+        {/* Mobile background */}
         <div
-          className="absolute inset-0 bg-cover animate-fade-in"
+          className="absolute inset-0 bg-cover animate-fade-in md:hidden"
           style={{
             backgroundImage: `url('/images/home/hero-bombo.png')`,
             backgroundPosition: '62% 317%',
+            backgroundRepeat: 'no-repeat',
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-b from-brand-dark/80 via-brand-dark/20 to-transparent h-40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/95 via-brand-dark/30 to-transparent" />
+          <div className="absolute inset-0 bg-brand-plum/10 mix-blend-color-dodge pointer-events-none" />
+        </div>
+
+        {/* Desktop / tablet background */}
+        <div
+          className="absolute inset-0 hidden bg-cover animate-fade-in md:block"
+          style={{
+            backgroundImage: `url('/images/home/hero-bombo.png')`,
+            backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
           }}
         >
