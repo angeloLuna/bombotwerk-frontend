@@ -73,7 +73,7 @@ function LoginContent() {
         <div className="space-y-4 text-center">
           <p className="text-xs text-neutral-400 font-sans font-light leading-relaxed">
             {isAdminFlow 
-              ? 'Inicia sesión con tu cuenta corporativa de Google o Facebook para gestionar el catálogo de productos, colecciones y órdenes del taller.'
+              ? `Inicia sesión con tu cuenta corporativa de Google${process.env.NEXT_PUBLIC_ENABLE_FACEBOOK_LOGIN === 'true' ? ' o Facebook' : ''} para gestionar el catálogo de productos, colecciones y órdenes del taller.`
               : 'Únete para guardar tu arsenal de prendas, consultar tu historial de pedidos, autocompletar tus datos de envío y recibir seguimiento de tu compra.'}
           </p>
         </div>
@@ -110,27 +110,29 @@ function LoginContent() {
             )}
           </Button>
 
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={handleFacebookLogin}
-            disabled={isAnyLoading}
-            className="w-full py-3 flex items-center justify-center gap-3 font-display font-black tracking-widest text-xs uppercase border-white/10 hover:border-brand-magenta/40 hover:bg-brand-magenta/5 text-white"
-          >
-            {loadingFacebook ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-                CONECTANDO...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4 fill-current text-neutral-300" viewBox="0 0 24 24">
-                  <path d="M9 8H7v3h2v9h3v-9h2.72l.42-3H12V6c0-.53.47-1 1-1h1.72V1h-2.88a3.5 3.5 0 0 0-3.84 3.5V8z" />
-                </svg>
-                CONTINUAR CON FACEBOOK
-              </>
-            )}
-          </Button>
+          {process.env.NEXT_PUBLIC_ENABLE_FACEBOOK_LOGIN === 'true' && (
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={handleFacebookLogin}
+              disabled={isAnyLoading}
+              className="w-full py-3 flex items-center justify-center gap-3 font-display font-black tracking-widest text-xs uppercase border-white/10 hover:border-brand-magenta/40 hover:bg-brand-magenta/5 text-white"
+            >
+              {loadingFacebook ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                  CONECTANDO...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 fill-current text-neutral-300" viewBox="0 0 24 24">
+                    <path d="M9 8H7v3h2v9h3v-9h2.72l.42-3H12V6c0-.53.47-1 1-1h1.72V1h-2.88a3.5 3.5 0 0 0-3.84 3.5V8z" />
+                  </svg>
+                  CONTINUAR CON FACEBOOK
+                </>
+              )}
+            </Button>
+          )}
 
           <div className="pt-2">
             <Button

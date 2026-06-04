@@ -342,7 +342,7 @@ export default function CheckoutPage() {
                 <p className="text-xs text-neutral-400 font-sans font-light leading-relaxed">
                   Inicia sesión para consultar tus pedidos, reutilizar tus datos y recibir seguimiento de tu compra.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className={`grid grid-cols-1 ${process.env.NEXT_PUBLIC_ENABLE_FACEBOOK_LOGIN === 'true' ? 'sm:grid-cols-2' : ''} gap-4 pt-2`}>
                   <Button
                     variant="primary"
                     type="button"
@@ -354,17 +354,19 @@ export default function CheckoutPage() {
                     </svg>
                     Google
                   </Button>
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => signIn('facebook', { callbackUrl: '/checkout' })}
-                    className="w-full flex items-center justify-center gap-2 font-display font-black tracking-widest text-[10px] uppercase border-white/10 text-white hover:border-brand-magenta/40 hover:bg-brand-magenta/5 py-3.5"
-                  >
-                    <svg className="w-4 h-4 fill-current text-neutral-300" viewBox="0 0 24 24">
-                      <path d="M9 8H7v3h2v9h3v-9h2.72l.42-3H12V6c0-.53.47-1 1-1h1.72V1h-2.88a3.5 3.5 0 0 0-3.84 3.5V8z" />
-                    </svg>
-                    Facebook
-                  </Button>
+                  {process.env.NEXT_PUBLIC_ENABLE_FACEBOOK_LOGIN === 'true' && (
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => signIn('facebook', { callbackUrl: '/checkout' })}
+                      className="w-full flex items-center justify-center gap-2 font-display font-black tracking-widest text-[10px] uppercase border-white/10 text-white hover:border-brand-magenta/40 hover:bg-brand-magenta/5 py-3.5"
+                    >
+                      <svg className="w-4 h-4 fill-current text-neutral-300" viewBox="0 0 24 24">
+                        <path d="M9 8H7v3h2v9h3v-9h2.72l.42-3H12V6c0-.53.47-1 1-1h1.72V1h-2.88a3.5 3.5 0 0 0-3.84 3.5V8z" />
+                      </svg>
+                      Facebook
+                    </Button>
+                  )}
                 </div>
                 <div className="text-center pt-4 border-t border-white/5">
                   <button

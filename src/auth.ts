@@ -3,18 +3,31 @@ import Google from 'next-auth/providers/google';
 import Facebook from 'next-auth/providers/facebook';
 import jwt from 'jsonwebtoken';
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'bombo-atelier-secret-key-321',
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    }),
+// Build providers list dynamically
+const providers: any[] = [
+  Google({
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  }),
+];
+
+// Facebook Login: only register if explicitly enabled and credentials exist
+if (
+  process.env.NEXT_PUBLIC_ENABLE_FACEBOOK_LOGIN === 'true' &&
+  process.env.FACEBOOK_CLIENT_ID &&
+  process.env.FACEBOOK_CLIENT_SECRET
+) {
+  providers.push(
     Facebook({
       clientId: process.env.FACEBOOK_CLIENT_ID,
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-    }),
-  ],
+    })
+  );
+}
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  providers,
   session: {
     strategy: 'jwt',
   },
