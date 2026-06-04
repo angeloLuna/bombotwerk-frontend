@@ -103,17 +103,24 @@ export default function HomePage() {
       <section className="relative h-[100svh] w-full flex flex-col justify-end overflow-hidden">
         {/* Background Image with Dark Vignette and Gradient Overlays */}
         <div
-          className="absolute inset-0 bg-cover bg-[75%_center] md:bg-center animate-fade-in"
-          style={{ backgroundImage: `url('/images/home/hero-bombo.png')` }}
+          className="absolute inset-0 bg-cover animate-fade-in"
+          style={{
+            backgroundImage: `url('/images/home/hero-bombo.png')`,
+            backgroundPosition: '62% 317%',
+            backgroundRepeat: 'no-repeat',
+          }}
         >
           {/* Subtle top overlay to transition from sticky header */}
-          <div className="absolute inset-0 bg-gradient-to-b from-brand-dark/70 via-transparent to-transparent h-28" />
+          <div className="absolute inset-0 bg-gradient-to-b from-brand-dark/80 via-brand-dark/20 to-transparent h-40" />
 
           {/* Left-to-right vignette */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
 
-          {/* Bottom gradient overlay from transparent to brand-dark (black) to blend into the homepage */}
-          <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
+          {/* Bottom gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/95 via-brand-dark/30 to-transparent" />
+
+          {/* Extra readability overlay around text area */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-transparent" />
 
           {/* Magenta neon atmosphere overlay */}
           <div className="absolute inset-0 bg-brand-plum/10 mix-blend-color-dodge pointer-events-none" />
@@ -170,11 +177,10 @@ export default function HomePage() {
             <Link
               key={idx}
               href={cat.href}
-              className={`group relative aspect-[4/3] w-full overflow-hidden border rounded-2xl transition-all duration-500 flex flex-col justify-end p-4 md:p-6 ${
-                cat.highlight
-                  ? 'border-brand-magenta/30 hover:border-brand-magenta hover:shadow-magenta-glow'
-                  : 'border-white/5 hover:border-brand-magenta/20'
-              }`}
+              className={`group relative aspect-[4/3] w-full overflow-hidden border rounded-2xl transition-all duration-500 flex flex-col justify-end p-4 md:p-6 ${cat.highlight
+                ? 'border-brand-magenta/30 hover:border-brand-magenta hover:shadow-magenta-glow'
+                : 'border-white/5 hover:border-brand-magenta/20'
+                }`}
             >
               {/* Background Image */}
               <div
@@ -333,7 +339,7 @@ export default function HomePage() {
             <p className="text-base text-neutral-300 font-sans font-light leading-relaxed tracking-wide">
               Diseño propio, confección local y artesanal. Cada puntada en nuestro atelier de la Ciudad de México está pensada para soportar dinámicas de alta intensidad. No vendemos prendas ordinarias: creamos el arsenal para tu performance diaria.
             </p>
-            
+
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="flex items-start gap-2.5">
                 <Zap className="w-5 h-5 text-brand-magenta shrink-0" />
@@ -380,7 +386,7 @@ export default function HomePage() {
       {/* 7. CTA FINAL (EXPLORA TODO EL CATÁLOGO) */}
       <section className="relative py-24 px-4 overflow-hidden border-t border-b border-white/5 bg-brand-charcoal/20">
         <div className="absolute inset-0 bg-gradient-to-r from-brand-magenta/5 via-transparent to-brand-magenta/5 mix-blend-color-dodge pointer-events-none" />
-        
+
         <div className="relative z-10 text-center max-w-xl mx-auto space-y-6 flex flex-col items-center">
           <span className="text-xs tracking-widest font-display text-brand-magenta font-black">
             CATÁLOGO COMPLETO
