@@ -1,7 +1,56 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 import Facebook from 'next-auth/providers/facebook';
-import jwt from 'jsonwebtoken';
+
+// Helper to sign JWT using Web Crypto API (Edge Runtime compatible)
+async function signJWT(payload: any, secret: string): Promise<string> {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  
+  // Base64URL encode helper
+  const base64UrlEncode = (input: string | Uint8Array): string => {
+    let binary = '';
+    if (typeof input === 'string') {
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(input);
+      bytes.forEach((b) => binary += String.fromCharCode(b));
+    } else {
+      input.forEach((b) => binary += String.fromCharCode(b));
+    }
+    return btoa(binary)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  };
+
+  // 1. Prepare Header and Payload
+  const headerStr = JSON.stringify(header);
+  const payloadStr = JSON.stringify(payload);
+  const encodedHeader = base64UrlEncode(headerStr);
+  const encodedPayload = base64UrlEncode(payloadStr);
+  const dataToSign = `${encodedHeader}.${encodedPayload}`;
+
+  // 2. Sign using Web Crypto API
+  const encoder = new TextEncoder();
+  const secretKeyData = encoder.encode(secret);
+  const dataToSignData = encoder.encode(dataToSign);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    secretKeyData,
+    { name: 'HMAC', hash: { name: 'SHA-256' } },
+    false,
+    ['sign']
+  );
+
+  const signatureBuffer = await crypto.subtle.sign(
+    'HMAC',
+    cryptoKey,
+    dataToSignData
+  );
+
+  const encodedSignature = base64UrlEncode(new Uint8Array(signatureBuffer));
+  return `${dataToSign}.${encodedSignature}`;
+}
 
 // Build providers list dynamically
 const providers: any[] = [
@@ -74,15 +123,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const backendSecret =
           process.env.BACKEND_JWT_SECRET || 'fallback-secret-for-jwt-signing-12345';
         
-        const backendJwt = jwt.sign(
-          {
-            userId: token.id,
-            email: token.email,
-            role: token.role || 'customer',
-          },
-          backendSecret,
-          { expiresIn: '30d' }
-        );
+        const payload = {
+          userId: token.id,
+          email: token.email,
+          role: token.role || 'customer',
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days
+        };
+
+        const backendJwt = await signJWT(payload, backendSecret);
         token.backendToken = backendJwt;
       }
 

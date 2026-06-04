@@ -32,7 +32,8 @@ export default function CheckoutPage() {
   const [splitShippingSelected, setSplitShippingSelected] = useState(false);
   const [shippingCalc, setShippingCalc] = useState<any>(null);
   const [calcLoading, setCalcLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'mercadopago' | 'card'>('mercadopago');
+  const [paymentMethod, setPaymentMethod] = useState<'mercadopago'>('mercadopago');
+  const [bypassShipping, setBypassShipping] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export default function CheckoutPage() {
           headers: {
             'Content-Type': 'application/json',
             'ngrok-skip-browser-warning': 'true',
+            ...(session?.backendToken ? { 'Authorization': `Bearer ${session.backendToken}` } : {}),
           },
           body: JSON.stringify({
             cartItems: cart.map(item => ({
@@ -88,6 +90,7 @@ export default function CheckoutPage() {
               quantity: item.quantity
             })),
             splitShippingSelected,
+            bypassShipping,
           }),
         });
 
@@ -106,7 +109,7 @@ export default function CheckoutPage() {
     };
 
     fetchCalculation();
-  }, [cart, splitShippingSelected]);
+  }, [cart, splitShippingSelected, bypassShipping, session]);
 
   // Helper to find variant matching a selected size
   const getVariantIdForSize = (product: any, size: string) => {
@@ -143,6 +146,7 @@ export default function CheckoutPage() {
             zip,
             method: 'standard',
             splitShippingSelected: shippingCalc ? shippingCalc.splitShippingSelected : false,
+            bypassShipping,
           },
           email,
           phone,
@@ -172,7 +176,11 @@ export default function CheckoutPage() {
     }
   };
 
-  const amountToCharge = shippingCalc ? shippingCalc.total : cartTotal + 150;
+  const amountToCharge = shippingCalc
+    ? shippingCalc.total
+    : bypassShipping
+      ? cartTotal
+      : cartTotal + 150;
   const initialization = React.useMemo(() => {
     const amountVal = Number(amountToCharge);
     return {
@@ -517,6 +525,37 @@ export default function CheckoutPage() {
                       </span>
                     </div>
 
+                    {/* Test Mode Shipping Bypass */}
+                    {session?.user?.role === 'admin' && (
+                      <label
+                        className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${
+                          bypassShipping
+                            ? 'border-yellow-500 bg-yellow-500/5 shadow-[0_0_15px_rgba(234,179,8,0.15)]'
+                            : 'border-white/10 bg-brand-charcoal hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={bypassShipping}
+                            onChange={(e) => setBypassShipping(e.target.checked)}
+                            disabled={isInfoConfirmed}
+                            className="accent-yellow-500 w-4 h-4 cursor-pointer disabled:opacity-50"
+                          />
+                          <div className="text-left font-sans text-xs">
+                            <p className="font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                              MODO PRUEBA: ENVÍO GRATIS
+                              <span className="bg-yellow-500/10 text-yellow-500 text-[8px] font-black tracking-widest px-1.5 py-0.5 rounded border border-yellow-500/20">TEST</span>
+                            </p>
+                            <p className="text-neutral-400 text-[10px] mt-0.5">
+                              Omitir costo de envío para realizar pruebas de cobros pequeños.
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-yellow-500">GRATIS</span>
+                      </label>
+                    )}
+
                     {/* Split Shipping Option (Mixed Cart Only) */}
                     {shippingCalc?.splitShippingAvailable && (
                       <label
@@ -625,69 +664,36 @@ export default function CheckoutPage() {
                   ) : (
                     <>
                       <div className="space-y-3">
-                        {/* Option 1: Mercado Pago */}
-                        <label
-                          className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${paymentMethod === 'mercadopago'
-                            ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
-                            : 'border-white/10 bg-brand-charcoal hover:border-white/20'
-                            }`}
+                        <div
+                          className="flex justify-between items-center p-4 border border-brand-magenta/30 bg-brand-magenta/5 shadow-magenta-glow rounded-xl"
                         >
                           <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="payment"
-                              checked={paymentMethod === 'mercadopago'}
-                              onChange={() => setPaymentMethod('mercadopago')}
-                              className="accent-brand-magenta w-4 h-4 cursor-pointer"
-                            />
+                            <div className="w-2 h-2 rounded-full bg-brand-magenta animate-pulse" />
                             <div className="text-left font-sans text-xs">
                               <p className="font-bold text-white uppercase tracking-wider">MERCADO PAGO</p>
-                              <p className="text-neutral-400 text-[10px] mt-0.5">Tarjeta de Crédito, Débito y Opciones Locales</p>
+                              <p className="text-neutral-400 text-[10px] mt-0.5">Tarjeta de Crédito, Débito, Transferencia y Opciones Locales</p>
                             </div>
                           </div>
                           <div className="flex gap-1 bg-white/5 px-2 py-1 rounded">
                             <span className="text-[8px] font-black text-neutral-400 tracking-wider">VISA</span>
                             <span className="text-[8px] font-black text-neutral-400 tracking-wider">MC</span>
-                          </div>
-                        </label>
-
-                        {/* Option 2: Credit Card */}
-                        <label
-                          className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${paymentMethod === 'card'
-                            ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
-                            : 'border-white/10 bg-brand-charcoal hover:border-white/20'
-                            }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="payment"
-                              checked={paymentMethod === 'card'}
-                              onChange={() => setPaymentMethod('card')}
-                              className="accent-brand-magenta w-4 h-4 cursor-pointer"
-                            />
-                            <div className="text-left font-sans text-xs">
-                              <p className="font-bold text-white uppercase tracking-wider">TARJETA DE CRÉDITO/DÉBITO</p>
-                              <p className="text-neutral-400 text-[10px] mt-0.5">Añade tarjeta de crédito o débito directamente</p>
-                            </div>
-                          </div>
-                          <span className="text-xs font-bold text-neutral-500 font-display tracking-widest">+ AÑADIR TARJETA</span>
-                        </label>
-                      </div>
-
-                      {paymentMethod === 'mercadopago' && (
-                        <div className="pt-4 border-t border-white/5">
-                          <div className="p-4 bg-brand-charcoal border border-white/5 rounded-xl space-y-4">
-                            <h4 className="text-[10px] tracking-widest text-neutral-400 font-bold uppercase">PARÁMETROS DE PAGO</h4>
-                            <Payment
-                              initialization={initialization}
-                              customization={customization}
-                              onSubmit={stableOnSubmit}
-                              onError={(error) => console.error('MercadoPago Brick Error:', error)}
-                            />
+                            <span className="text-[8px] font-black text-neutral-400 tracking-wider">AMEX</span>
                           </div>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="pt-4 border-t border-white/5">
+                        <div className="p-4 bg-brand-charcoal border border-white/5 rounded-xl space-y-4">
+                          <h4 className="text-[10px] tracking-widest text-neutral-400 font-bold uppercase">PARÁMETROS DE PAGO</h4>
+                          <Payment
+                            key={`mp-payment-${amountToCharge}`}
+                            initialization={initialization}
+                            customization={customization}
+                            onSubmit={stableOnSubmit}
+                            onError={(error) => console.error('MercadoPago Brick Error:', error)}
+                          />
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
@@ -772,22 +778,9 @@ export default function CheckoutPage() {
 
             {/* Buy Action */}
             <div className="pt-4 space-y-4">
-              {paymentMethod !== 'mercadopago' ? (
-                <Button
-                  variant="primary"
-                  fullWidth
-                  size="lg"
-                  type="submit"
-                  disabled={loading}
-                  className="shadow-magenta-glow text-xs"
-                >
-                  {loading ? 'PROCESANDO...' : 'COMPLETAR COMPRA'}
-                </Button>
-              ) : (
-                <div className="text-[10px] text-center text-neutral-500 font-display tracking-widest border border-white/5 bg-brand-dark/30 rounded-lg p-3">
-                  COMPLETA LA TRANSACCIÓN SEGURA CON EL FORMULARIO DE MERCADO PAGO
-                </div>
-              )}
+              <div className="text-[10px] text-center text-neutral-500 font-display tracking-widest border border-white/5 bg-brand-dark/30 rounded-lg p-3">
+                COMPLETA LA TRANSACCIÓN SEGURA CON EL FORMULARIO DE MERCADO PAGO
+              </div>
 
               <div className="flex justify-center items-center gap-1.5 text-[9px] text-neutral-500 font-display tracking-widest">
                 <Lock className="w-3.5 h-3.5 text-brand-magenta" />
