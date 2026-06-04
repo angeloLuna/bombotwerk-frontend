@@ -7,12 +7,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'bombo-atelier-secret-key-321',
   providers: [
     Google({
-      clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.NEXT_GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     }),
     Facebook({
-      clientId: process.env.NEXT_PUBLIC_FACEBOOK_CLIENT_ID || process.env.FACEBOOK_CLIENT_ID || 'facebook-client-id',
-      clientSecret: process.env.NEXT_FACEBOOK_CLIENT_SECRET || process.env.FACEBOOK_CLIENT_SECRET || 'facebook-client-secret',
+      clientId: process.env.FACEBOOK_CLIENT_ID,
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
     }),
   ],
   session: {
