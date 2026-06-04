@@ -74,6 +74,18 @@ if (
   );
 }
 
+export function getAdminEmails() {
+  return (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAdminEmail(email?: string | null) {
+  if (!email) return false;
+  return getAdminEmails().includes(email.trim().toLowerCase());
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   providers,
@@ -84,7 +96,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role || 'customer';
+        token.role = isAdminEmail(user.email) ? 'admin' : (user as any).role || 'customer';
       }
 
       // If logging in, sync the user's profile with the backend
