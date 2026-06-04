@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Full-page loading spinner using the Bombo Twerk brand magenta glow.
  */
-export default function LoadingSpinner({ message = 'LOADING...' }: { message?: string }) {
+export default function LoadingSpinner({ message = 'CARGANDO...' }: { message?: string }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[40vh] gap-6 py-16">
       {/* Outer ring */}

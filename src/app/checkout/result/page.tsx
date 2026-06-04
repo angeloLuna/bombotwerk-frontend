@@ -110,7 +110,7 @@ function ResultPageContent() {
           text: 'text-green-500',
           glow: 'shadow-green-glow',
           icon: <CheckCircle2 className="w-12 h-12 text-green-500" />,
-          title: 'LOOK SECURED',
+          title: 'PAGO APROBADO',
           subtitle: 'PAGO APROBADO Y CONFIRMADO',
           desc: 'Tu selección de performancewear está asegurada. Si tu pedido requiere personalización, nuestro taller en la CDMX ya está preparando los parámetros de confección.',
         };
@@ -120,7 +120,7 @@ function ResultPageContent() {
           text: 'text-brand-gold',
           glow: 'shadow-gold-glow',
           icon: <Clock className="w-12 h-12 text-brand-gold" />,
-          title: 'TRANSACTION PENDING',
+          title: 'PAGO PENDIENTE',
           subtitle: 'PAGO EN PROCESO',
           desc: 'Tu pago está siendo procesado por el proveedor. Reservaremos tus prendas en cuanto se complete la transacción. Revisa tu email para actualizaciones.',
         };
@@ -130,7 +130,7 @@ function ResultPageContent() {
           text: 'text-red-500',
           glow: 'shadow-red-glow',
           icon: <XCircle className="w-12 h-12 text-red-500" />,
-          title: 'LOOK FAILED',
+          title: 'PAGO FALLIDO',
           subtitle: 'TRANSACCIÓN RECHAZADA',
           desc: 'El pago no pudo completarse. Por favor, intenta de nuevo utilizando otra tarjeta u otro método de pago para asegurar tus siluetas.',
         };
@@ -141,7 +141,7 @@ function ResultPageContent() {
           text: 'text-neutral-500',
           glow: '',
           icon: <XCircle className="w-12 h-12 text-neutral-500" />,
-          title: 'TRANSACTION CANCELLED',
+          title: 'PAGO CANCELADO',
           subtitle: 'PEDIDO CANCELADO',
           desc: 'La transacción ha sido cancelada por el usuario o por inactividad. Puedes volver al checkout para intentar nuevamente.',
         };
@@ -243,13 +243,19 @@ function ResultPageContent() {
                   <Price amount={order.subtotal} />
                 </div>
                 <div className="flex justify-between text-neutral-400">
-                  <span>COSTO DE ENVÍO</span>
-                  {order.shippingTotal > 0 ? (
-                    <Price amount={order.shippingTotal} />
-                  ) : (
+                  <span>ENVÍO ESTÁNDAR</span>
+                  {order.isFreeShipping || Number(order.shippingCost) === 0 ? (
                     <span className="text-brand-gold font-bold uppercase tracking-wider text-[10px]">Gratis</span>
+                  ) : (
+                    <Price amount={order.shippingCost ?? order.shippingTotal} />
                   )}
                 </div>
+                {order.splitShippingSelected && (
+                  <div className="flex justify-between text-neutral-400">
+                    <span>ENVÍO DIVIDIDO</span>
+                    <Price amount={order.splitShippingCost} />
+                  </div>
+                )}
                 <div className="flex justify-between text-white font-bold border-t border-white/5 pt-3">
                   <span className="font-display tracking-widest text-neutral-400">TOTAL PAGADO</span>
                   <Price amount={order.total} className="text-xl text-glow-magenta text-brand-magenta font-black" />
@@ -259,17 +265,48 @@ function ResultPageContent() {
 
             {/* 4. Delivery location details if available */}
             {order.shippingAddress && (
-              <div className="bg-brand-charcoal border border-white/5 p-6 rounded-2xl space-y-3">
+              <div className="bg-brand-charcoal border border-white/5 p-6 rounded-2xl space-y-4">
                 <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-brand-magenta" />
-                  DESTINO DE ENVÍO
+                  LOGÍSTICA Y DESTINO DE ENVÍO
                 </h3>
-                <div className="text-xs text-neutral-300 font-sans leading-relaxed">
-                  <p className="font-bold text-white uppercase tracking-wider mb-1">Dirección Registrada:</p>
-                  <p className="font-light">{order.shippingAddress}</p>
-                  <p className="text-neutral-500 text-[10px] mt-2 font-display tracking-wider">
-                    MÉTODO: {order.shippingMethod === 'express' ? 'ENVÍO EXPRESS (1-2 DÍAS)' : 'ENVÍO CONFECCIÓN CDMX (4-6 DÍAS)'}
-                  </p>
+                <div className="text-xs text-neutral-300 font-sans leading-relaxed space-y-3">
+                  <div>
+                    <p className="font-bold text-white uppercase tracking-wider mb-0.5">Dirección Registrada:</p>
+                    <p className="font-light">{order.shippingAddress}</p>
+                  </div>
+                  
+                  <div className="border-t border-white/5 pt-3 space-y-2">
+                    <p className="text-neutral-400 text-[10px] font-display tracking-wider uppercase">
+                      MÉTODO DE ENVÍO: {order.splitShippingSelected ? 'ENVÍO DIVIDIDO' : 'ENVÍO ESTÁNDAR'}
+                    </p>
+                    
+                    {order.splitShippingSelected ? (
+                      <div className="space-y-2 bg-brand-dark/30 p-3 rounded-lg border border-white/5">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-white uppercase text-[10px]">Paquete 1: Piezas Disponibles (Stock)</p>
+                          <p className="text-neutral-400 text-[10px]">Entrega estimada: {order.firstPackageEstimatedMinBusinessDays ?? 2} a {order.firstPackageEstimatedMaxBusinessDays ?? 5} días hábiles.</p>
+                        </div>
+                        <div className="space-y-0.5 border-t border-white/5 pt-2">
+                          <p className="font-bold text-white uppercase text-[10px]">Paquete 2: Piezas Bajo Demanda (Taller CDMX)</p>
+                          <p className="text-neutral-400 text-[10px]">Entrega estimada: {order.secondPackageEstimatedMinBusinessDays ?? 9} a {order.secondPackageEstimatedMaxBusinessDays ?? 14} días hábiles.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-brand-dark/30 p-3 rounded-lg border border-white/5 space-y-1">
+                        <p className="font-bold text-white uppercase text-[10px]">Estimado de entrega global:</p>
+                        <p className="text-neutral-400 text-[10px] flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-brand-magenta" />
+                          <span>{order.estimatedDeliveryMinBusinessDays ?? 2} a {order.estimatedDeliveryMaxBusinessDays ?? 14} días hábiles.</span>
+                        </p>
+                        {order.fulfillmentNotes && (
+                          <p className="text-[10px] text-neutral-400 italic mt-1 font-light leading-relaxed">
+                            {order.fulfillmentNotes}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

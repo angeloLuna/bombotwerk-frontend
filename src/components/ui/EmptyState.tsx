@@ -13,8 +13,8 @@ interface EmptyStateProps {
  * Branded empty state shown when a page has no data to display.
  */
 export default function EmptyState({
-  title = 'NOTHING HERE YET',
-  message = 'This section has no items at the moment. Check back soon.',
+  title = 'NADA POR AQUÍ AÚN',
+  message = 'Esta sección no tiene artículos por el momento. Vuelve pronto.',
   actionLabel,
   actionHref,
 }: EmptyStateProps) {

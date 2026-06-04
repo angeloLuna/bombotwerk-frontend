@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { adminApi } from '@/lib/admin-api';
 import type { AdminCollection } from '@/types/admin';
 import { Plus, Pencil, Check, X, Loader2, RefreshCw } from 'lucide-react';
+import ImageUploader from '@/components/ui/ImageUploader';
 
 type EditState = Partial<AdminCollection> & { id?: string };
 
@@ -22,6 +23,8 @@ const EMPTY_FORM: Omit<AdminCollection, 'id' | '_count'> = {
   tagline: '',
   description: '',
   bgImage: '',
+  coverImageUrl: '',
+  heroImageUrl: '',
 };
 
 export default function AdminCollectionsPage() {
@@ -107,41 +110,61 @@ export default function AdminCollectionsPage() {
                   {formError}
                 </p>
               )}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div>
-                  <label className="text-[9px] text-neutral-500 tracking-widest uppercase">Name *</label>
-                  <input
-                    className={inputCls}
-                    required
-                    value={editing.name ?? ''}
-                    onChange={(e) => {
-                      setEditing((prev) => ({
-                        ...prev,
-                        name: e.target.value,
-                        slug: slugify(e.target.value),
-                      }));
-                    }}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[9px] text-neutral-500 tracking-widest uppercase block mb-1">Name *</label>
+                    <input
+                      className={inputCls}
+                      required
+                      value={editing.name ?? ''}
+                      onChange={(e) => {
+                        setEditing((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                          slug: slugify(e.target.value),
+                        }));
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-neutral-500 tracking-widest uppercase block mb-1">Slug *</label>
+                    <input
+                      className={inputCls}
+                      required
+                      value={editing.slug ?? ''}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, slug: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-neutral-500 tracking-widest uppercase block mb-1">Tagline</label>
+                    <input
+                      className={inputCls}
+                      value={editing.tagline ?? ''}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, tagline: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ImageUploader
+                    value={editing.coverImageUrl ?? ''}
+                    onChange={(url) => setEditing((prev) => ({ ...prev, coverImageUrl: url }))}
+                    label="Imagen de Portada (Cards)"
+                    helpText="Recomendado: imagen cuadrada o vertical, ideal para tarjetas."
+                  />
+                  <ImageUploader
+                    value={editing.heroImageUrl ?? ''}
+                    onChange={(url) => setEditing((prev) => ({ ...prev, heroImageUrl: url }))}
+                    label="Imagen de Banner (Hero)"
+                    helpText="Recomendado: imagen horizontal 16:9, ideal para cabeceras."
                   />
                 </div>
-                <div>
-                  <label className="text-[9px] text-neutral-500 tracking-widest uppercase">Slug *</label>
-                  <input
-                    className={inputCls}
-                    required
-                    value={editing.slug ?? ''}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, slug: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] text-neutral-500 tracking-widest uppercase">Tagline</label>
-                  <input
-                    className={inputCls}
-                    value={editing.tagline ?? ''}
-                    onChange={(e) => setEditing((prev) => ({ ...prev, tagline: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] text-neutral-500 tracking-widest uppercase">BG Image URL</label>
+
+                <div className="pt-2 border-t border-white/5">
+                  <label className="text-[9px] text-neutral-500 tracking-widest uppercase block mb-1">
+                    Imagen de Fallback Legacy (BG Image URL)
+                  </label>
                   <input
                     type="url"
                     className={inputCls}
@@ -186,18 +209,26 @@ export default function AdminCollectionsPage() {
           <span className="text-xs text-neutral-400">{c._count?.products ?? 0}</span>
         </td>
         <td className="px-4 py-3.5 hidden lg:table-cell">
-          {c.bgImage ? (
-            <a
-              href={c.bgImage}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[10px] text-brand-magenta hover:underline truncate max-w-[160px] block"
-            >
-              {c.bgImage}
-            </a>
-          ) : (
-            <span className="text-neutral-700 text-xs">—</span>
-          )}
+          <div className="flex flex-col gap-1 text-[10px] font-mono">
+            {c.coverImageUrl && (
+              <span className="text-green-400 truncate max-w-[150px]" title={c.coverImageUrl}>
+                Cover: {c.coverImageUrl.substring(c.coverImageUrl.lastIndexOf('/') + 1)}
+              </span>
+            )}
+            {c.heroImageUrl && (
+              <span className="text-blue-400 truncate max-w-[150px]" title={c.heroImageUrl}>
+                Hero: {c.heroImageUrl.substring(c.heroImageUrl.lastIndexOf('/') + 1)}
+              </span>
+            )}
+            {c.bgImage && (
+              <span className="text-neutral-500 truncate max-w-[150px]" title={c.bgImage}>
+                Legacy: {c.bgImage.substring(c.bgImage.lastIndexOf('/') + 1)}
+              </span>
+            )}
+            {!c.coverImageUrl && !c.heroImageUrl && !c.bgImage && (
+              <span className="text-neutral-700">—</span>
+            )}
+          </div>
         </td>
         <td className="px-4 py-3.5 text-right">
           <button
@@ -290,15 +321,34 @@ export default function AdminCollectionsPage() {
                   placeholder="Collection description…"
                 />
               </div>
-              <div className="md:col-span-2">
-                <label className="text-[9px] text-neutral-500 tracking-widest uppercase block mb-1">Background Image URL</label>
-                <input
-                  type="url"
-                  className={inputCls}
-                  value={newForm.bgImage ?? ''}
-                  onChange={(e) => setNewForm((prev) => ({ ...prev, bgImage: e.target.value }))}
-                  placeholder="https://..."
-                />
+              <div className="md:col-span-2 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ImageUploader
+                    value={newForm.coverImageUrl ?? ''}
+                    onChange={(url) => setNewForm((prev) => ({ ...prev, coverImageUrl: url }))}
+                    label="Imagen de Portada (Cards)"
+                    helpText="Recomendado: imagen cuadrada o vertical, ideal para tarjetas."
+                  />
+                  <ImageUploader
+                    value={newForm.heroImageUrl ?? ''}
+                    onChange={(url) => setNewForm((prev) => ({ ...prev, heroImageUrl: url }))}
+                    label="Imagen de Banner (Hero)"
+                    helpText="Recomendado: imagen horizontal 16:9, ideal para cabeceras."
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-white/5">
+                  <label className="text-[9px] text-neutral-500 tracking-widest uppercase block mb-1">
+                    Imagen de Fallback Legacy (BG Image URL)
+                  </label>
+                  <input
+                    type="url"
+                    className={inputCls}
+                    value={newForm.bgImage ?? ''}
+                    onChange={(e) => setNewForm((prev) => ({ ...prev, bgImage: e.target.value }))}
+                    placeholder="https://..."
+                  />
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3 pt-1">

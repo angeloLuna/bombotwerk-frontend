@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X, ShoppingBag, Search, User, Sparkles, MessageSquare, Compass } from 'lucide-react';
@@ -9,6 +10,7 @@ import { useCart } from '@/context/CartContext';
 const Navigation: React.FC = () => {
   const pathname = usePathname();
   const { cartCount } = useCart();
+  const { data: session, status } = useSession();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,11 +27,11 @@ const Navigation: React.FC = () => {
 
   const navLinks = [
     { name: 'INICIO', path: '/' },
-    { name: 'TIENDA', path: '/shop' },
-    { name: 'COLECCIONES', path: '/collections' },
-    { name: 'LATIN PULSE', path: '/collections/latin-pulse' },
-    { name: 'NOCTURNAL PULSE', path: '/collections/nocturnal-pulse' },
-    { name: 'VELVET MOTION', path: '/collections/velvet-motion' },
+    { name: 'TIENDA', path: '/tienda' },
+    { name: 'COLECCIONES', path: '/colecciones' },
+    { name: 'LATIN PULSE', path: '/colecciones/latin-pulse' },
+    { name: 'NOCTURNAL PULSE', path: '/colecciones/nocturnal-pulse' },
+    { name: 'VELVET MOTION', path: '/colecciones/velvet-motion' },
     { name: 'TU ARSENAL (CARRITO)', path: '/cart' },
   ];
 
@@ -118,6 +120,41 @@ const Navigation: React.FC = () => {
                   </Link>
                 );
               })}
+
+              <div className="border-t border-white/5 pt-6 space-y-6">
+                {status === 'authenticated' ? (
+                  <>
+                    <Link
+                      href="/profile"
+                      onClick={() => setIsDrawerOpen(false)}
+                      className={`font-sans text-lg font-medium tracking-wider hover:text-brand-magenta transition-colors block ${
+                        pathname?.startsWith('/profile') ? 'text-brand-magenta font-bold border-l-2 border-brand-magenta pl-3' : 'text-neutral-300'
+                      }`}
+                    >
+                      MI PERFIL
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setIsDrawerOpen(false);
+                        signOut({ callbackUrl: '/' });
+                      }}
+                      className="font-sans text-lg font-medium tracking-wider text-neutral-400 hover:text-brand-magenta transition-colors text-left block w-full"
+                    >
+                      CERRAR SESIÓN
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    href="/login"
+                    onClick={() => setIsDrawerOpen(false)}
+                    className={`font-sans text-lg font-medium tracking-wider hover:text-brand-magenta transition-colors block ${
+                      pathname === '/login' ? 'text-brand-magenta font-bold border-l-2 border-brand-magenta pl-3' : 'text-neutral-300'
+                    }`}
+                  >
+                    INICIAR SESIÓN
+                  </Link>
+                )}
+              </div>
             </nav>
 
             <div className="mt-auto border-t border-white/5 pt-6 space-y-4">
@@ -187,9 +224,9 @@ const Navigation: React.FC = () => {
 
         {/* Tab 2: Exclusivo */}
         <Link
-          href="/collections/latin-pulse"
+          href="/colecciones/latin-pulse"
           className={`flex flex-col items-center gap-1 transition-colors ${
-            pathname.includes('/collections/latin-pulse') ? 'text-brand-magenta' : 'text-neutral-400 hover:text-white'
+            pathname.includes('/colecciones/latin-pulse') ? 'text-brand-magenta' : 'text-neutral-400 hover:text-white'
           }`}
         >
           <Sparkles className="w-5 h-5" />
@@ -218,9 +255,9 @@ const Navigation: React.FC = () => {
 
         {/* Tab 5: Perfil */}
         <Link
-          href="/checkout"
+          href="/profile"
           className={`flex flex-col items-center gap-1 transition-colors ${
-            pathname === '/checkout' ? 'text-brand-magenta' : 'text-neutral-400 hover:text-white'
+            pathname?.startsWith('/profile') ? 'text-brand-magenta' : 'text-neutral-400 hover:text-white'
           }`}
         >
           <User className="w-5 h-5" />

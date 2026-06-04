@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ApiProduct as Product } from '@/types/api';
+import AddToCartConfirmation from '@/components/ui/AddToCartConfirmation';
 
 export interface CartItem {
   product: Product;
@@ -17,6 +18,9 @@ interface CartContextType {
   clearCart: () => void;
   cartTotal: number;
   cartCount: number;
+  showConfirmation: boolean;
+  setShowConfirmation: (show: boolean) => void;
+  lastAddedItem: CartItem | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -48,6 +52,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cart, isLoaded]);
 
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [lastAddedItem, setLastAddedItem] = useState<CartItem | null>(null);
+
   const addToCart = (product: Product, size: string, quantity = 1) => {
     setCart((prevCart) => {
       const existingItemIndex = prevCart.findIndex(
@@ -56,12 +63,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (existingItemIndex > -1) {
         const newCart = [...prevCart];
-        newCart[existingItemIndex].quantity += quantity;
+        newCart[existingItemIndex] = {
+          ...newCart[existingItemIndex],
+          quantity: newCart[existingItemIndex].quantity + quantity,
+        };
         return newCart;
       }
 
       return [...prevCart, { product, quantity, selectedSize: size }];
     });
+
+    setLastAddedItem({ product, quantity, selectedSize: size });
+    setShowConfirmation(true);
   };
 
   const removeFromCart = (productId: string, size: string) => {
@@ -107,9 +120,28 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clearCart,
         cartTotal,
         cartCount,
+        showConfirmation,
+        setShowConfirmation,
+        lastAddedItem,
       }}
     >
       {children}
+      <AddToCartConfirmation
+        isOpen={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        item={lastAddedItem}
+        onChangeQuantity={(qty) => {
+          if (lastAddedItem) {
+            if (qty <= 0) {
+              removeFromCart(lastAddedItem.product.id, lastAddedItem.selectedSize);
+              setShowConfirmation(false);
+            } else {
+              updateQuantity(lastAddedItem.product.id, lastAddedItem.selectedSize, qty);
+              setLastAddedItem(prev => prev ? { ...prev, quantity: qty } : null);
+            }
+          }
+        }}
+      />
     </CartContext.Provider>
   );
 };

@@ -1,20 +1,19 @@
-// ─── Admin-specific TypeScript types ──────────────────────────────────────────
 // These mirror the backend DTOs and Prisma shapes for use in the admin UI.
+import { ProductImage } from './api';
 
 export interface AdminSizeStock {
   id?: string;
   size: string;            // S | M | L | OS
   quantity: number;
-  madeToOrderEnabled: boolean;
-  productionDaysMin?: number;
-  productionDaysMax?: number;
 }
 
 export interface AdminVariant {
   id?: string;
   sku: string;
   color?: string;
-  madeToOrderEnabled?: boolean;
+  availabilityMode?: string;
+  madeToOrderMinDays?: number;
+  madeToOrderMaxDays?: number;
   stocks: AdminSizeStock[];
 }
 
@@ -25,6 +24,8 @@ export interface AdminCollection {
   tagline?: string;
   description?: string;
   bgImage?: string;
+  coverImageUrl?: string;
+  heroImageUrl?: string;
   _count?: { products: number };
   createdAt?: string;
   updatedAt?: string;
@@ -39,10 +40,13 @@ export interface AdminProduct {
   category?: string;
   isActive: boolean;
   isNewArrival: boolean;
+  isFeatured: boolean;
+  compareAtPrice?: number | null;
   collectionId?: string;
   collection?: { id: string; name: string; slug: string } | null;
   variants: AdminVariant[];
   media: { id: string; url: string; sortOrder: number }[];
+  images?: ProductImage[];
   createdAt: string;
   updatedAt: string;
 }
@@ -52,14 +56,14 @@ export interface AdminProduct {
 export interface SizeStockForm {
   size: string;
   quantity: number;
-  madeToOrderEnabled: boolean;
-  productionDaysMin: number;
-  productionDaysMax: number;
 }
 
 export interface VariantForm {
   sku: string;
   color: string;
+  availabilityMode: string;
+  madeToOrderMinDays: number;
+  madeToOrderMaxDays: number;
   stocks: SizeStockForm[];
 }
 
@@ -72,24 +76,30 @@ export interface ProductForm {
   collectionId: string;
   isActive: boolean;
   isNewArrival: boolean;
+  isFeatured: boolean;
+  compareAtPrice: string;  // string in the form, converted to number on submit
   mediaUrls: string[];
   variants: VariantForm[];
 }
 
-export const DEFAULT_SIZES = ['S', 'M', 'L'];
+export const DEFAULT_SIZES = ['XCH', 'CH', 'M', 'G', 'XG'];
 
 export function defaultSizeStocks(): SizeStockForm[] {
   return DEFAULT_SIZES.map((size) => ({
     size,
     quantity: 0,
-    madeToOrderEnabled: false,
-    productionDaysMin: 5,
-    productionDaysMax: 7,
   }));
 }
 
 export function defaultVariant(): VariantForm {
-  return { sku: '', color: '', stocks: defaultSizeStocks() };
+  return {
+    sku: '',
+    color: '',
+    availabilityMode: 'stock_only',
+    madeToOrderMinDays: 7,
+    madeToOrderMaxDays: 9,
+    stocks: defaultSizeStocks(),
+  };
 }
 
 export function defaultProductForm(): ProductForm {
@@ -102,6 +112,8 @@ export function defaultProductForm(): ProductForm {
     collectionId: '',
     isActive: true,
     isNewArrival: false,
+    isFeatured: false,
+    compareAtPrice: '',
     mediaUrls: [''],
     variants: [defaultVariant()],
   };
@@ -118,16 +130,18 @@ export function formToCreateDto(form: ProductForm) {
     collectionId: form.collectionId || undefined,
     isActive: form.isActive,
     isNewArrival: form.isNewArrival,
+    isFeatured: form.isFeatured,
+    compareAtPrice: form.compareAtPrice ? parseFloat(form.compareAtPrice) : undefined,
     mediaUrls: form.mediaUrls.filter(Boolean),
     variants: form.variants.map((v) => ({
       sku: v.sku,
       color: v.color || undefined,
+      availabilityMode: v.availabilityMode,
+      madeToOrderMinDays: v.availabilityMode !== 'stock_only' && v.availabilityMode !== 'discontinued' ? Number(v.madeToOrderMinDays) : undefined,
+      madeToOrderMaxDays: v.availabilityMode !== 'stock_only' && v.availabilityMode !== 'discontinued' ? Number(v.madeToOrderMaxDays) : undefined,
       stocks: v.stocks.map((s) => ({
         size: s.size,
         quantity: s.quantity,
-        madeToOrderEnabled: s.madeToOrderEnabled,
-        productionDaysMin: s.madeToOrderEnabled ? s.productionDaysMin : undefined,
-        productionDaysMax: s.madeToOrderEnabled ? s.productionDaysMax : undefined,
       })),
     })),
   };
@@ -144,23 +158,40 @@ export function productToForm(p: AdminProduct): ProductForm {
     collectionId: p.collectionId ?? '',
     isActive: p.isActive,
     isNewArrival: p.isNewArrival,
+    isFeatured: p.isFeatured,
+    compareAtPrice: p.compareAtPrice ? String(p.compareAtPrice) : '',
     mediaUrls: p.media.length > 0 ? p.media.map((m) => m.url) : [''],
     variants:
       p.variants.length > 0
-        ? p.variants.map((v) => ({
-            sku: v.sku,
-            color: v.color ?? '',
-            stocks:
-              v.stocks.length > 0
-                ? v.stocks.map((s) => ({
-                    size: s.size,
-                    quantity: s.quantity,
-                    madeToOrderEnabled: s.madeToOrderEnabled,
-                    productionDaysMin: (s as any).productionDaysMin ?? 5,
-                    productionDaysMax: (s as any).productionDaysMax ?? 7,
-                  }))
-                : defaultSizeStocks(),
-          }))
+        ? p.variants.map((v) => {
+            const stockMap = new Map((v.stocks || []).map((s) => [s.size.toUpperCase(), s.quantity]));
+            
+            // Build merged stocks prioritizing DEFAULT_SIZES
+            const mergedStocks = DEFAULT_SIZES.map((size) => ({
+              size,
+              quantity: stockMap.has(size.toUpperCase()) ? stockMap.get(size.toUpperCase())! : 0,
+            }));
+
+            // If there are other non-default sizes (e.g. shoes, custom, legacy), append them
+            (v.stocks || []).forEach((s) => {
+              const upperSize = s.size.toUpperCase();
+              if (!DEFAULT_SIZES.includes(upperSize)) {
+                mergedStocks.push({
+                  size: s.size,
+                  quantity: s.quantity,
+                });
+              }
+            });
+
+            return {
+              sku: v.sku,
+              color: v.color ?? '',
+              availabilityMode: v.availabilityMode ?? 'stock_only',
+              madeToOrderMinDays: v.madeToOrderMinDays ?? 7,
+              madeToOrderMaxDays: v.madeToOrderMaxDays ?? 9,
+              stocks: mergedStocks,
+            };
+          })
         : [defaultVariant()],
   };
 }
@@ -174,6 +205,9 @@ export interface AdminOrderItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  fulfillmentType?: string;
+  madeToOrderMinDays?: number | null;
+  madeToOrderMaxDays?: number | null;
 }
 
 export interface AdminPayment {
@@ -211,5 +245,30 @@ export interface AdminOrder {
   updatedAt: string;
   payment: AdminPayment | null;
   items: AdminOrderItem[];
+
+  // Shipping snapshot fields
+  shippingLabel?: string | null;
+  shippingCost?: number;
+  isFreeShipping?: boolean;
+  freeShippingThreshold?: number;
+  amountRemainingForFreeShipping?: number;
+  hasInStockItems?: boolean;
+  hasMadeToOrderItems?: boolean;
+  isMixedFulfillmentCart?: boolean;
+  splitShippingSelected?: boolean;
+  splitShippingCost?: number;
+  estimatedDeliveryMinBusinessDays?: number | null;
+  estimatedDeliveryMaxBusinessDays?: number | null;
+  firstPackageEstimatedMinBusinessDays?: number | null;
+  firstPackageEstimatedMaxBusinessDays?: number | null;
+  secondPackageEstimatedMinBusinessDays?: number | null;
+  secondPackageEstimatedMaxBusinessDays?: number | null;
+  fulfillmentNotes?: string | null;
+  shippingNotes?: string | null;
+
+  // Email confirmation control fields
+  confirmationEmailSentAt?: string | null;
+  confirmationEmailStatus?: string | null;
+  confirmationEmailError?: string | null;
 }
 

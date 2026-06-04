@@ -23,7 +23,7 @@ export default function CollectionsPage() {
       const data = await getCollections();
       setCollections(data);
     } catch (e: any) {
-      setError(e?.message ?? 'Failed to load collections.');
+      setError(e?.message ?? 'Error al cargar las colecciones.');
     } finally {
       setLoading(false);
     }
@@ -37,13 +37,13 @@ export default function CollectionsPage() {
   const moodLinks = collections.length > 0
     ? collections.map((c) => ({
         title: c.name,
-        desc: c.tagline ?? 'BROWSE COLLECTION',
-        path: `/collections/${c.slug}`,
+        desc: c.tagline ?? 'EXPLORAR COLECCIÓN',
+        path: `/colecciones/${c.slug}`,
       }))
     : [
-        { title: 'SAVAGE ENERGY', desc: 'HIGH-INTENSITY VIBES', path: '/collections/latin-pulse' },
-        { title: 'CLUB GLOW', desc: 'NEON LIT REFLECTIVES', path: '/collections/nocturnal-pulse' },
-        { title: 'STUDIO VIBES', desc: 'SENSORY PERFORMANCEWEAR', path: '/collections/velvet-motion' },
+        { title: 'ENERGÍA SALVAJE', desc: 'VIBRA DE ALTA INTENSIDAD', path: '/colecciones/latin-pulse' },
+        { title: 'BRILLO DE CLUB', desc: 'REFLECTANTES CON LUZ DE NEÓN', path: '/colecciones/nocturnal-pulse' },
+        { title: 'VIBRA DE ESTUDIO', desc: 'ROPA DE RENDIMIENTO SENSORIAL', path: '/colecciones/velvet-motion' },
       ];
 
   return (
@@ -52,11 +52,11 @@ export default function CollectionsPage() {
       {/* Editorial Header */}
       <section className="pt-12 pb-6 px-4 text-center max-w-2xl mx-auto space-y-4">
         <span className="text-[10px] tracking-widest font-display text-brand-magenta font-black flex items-center justify-center gap-1">
-          <Sparkles className="w-3.5 h-3.5" /> ARCHIVE & DROPS
+          <Sparkles className="w-3.5 h-3.5" /> ARCHIVO Y LANZAMIENTOS
         </span>
         <h1 className="text-4xl md:text-6xl font-serif text-white tracking-wide uppercase">
-          SHOP THE <br />
-          <span className="italic font-normal text-brand-magenta text-glow-magenta">SILHOUETTES</span>
+          COMPRA LAS <br />
+          <span className="italic font-normal text-brand-magenta text-glow-magenta">SILUETAS</span>
         </h1>
         <div className="w-10 h-[1px] bg-brand-magenta/60 mx-auto mt-4" />
       </section>
@@ -64,13 +64,13 @@ export default function CollectionsPage() {
       {/* 1. COLLECTIONS GRID (BANNER STYLES) */}
       <section className="px-4 md:px-8 py-10 max-w-5xl mx-auto space-y-12">
         {loading ? (
-          <LoadingSpinner message="LOADING DROPS..." />
+          <LoadingSpinner message="CARGANDO LANZAMIENTOS..." />
         ) : error ? (
           <ErrorState message={error} onRetry={fetchCollections} />
         ) : collections.length === 0 ? (
           <EmptyState
-            title="NO DROPS YET"
-            message="New collections are being crafted in CDMX. Check back soon."
+            title="SIN LANZAMIENTOS AÚN"
+            message="Se están confeccionando nuevas colecciones en la CDMX. Regresa pronto."
           />
         ) : (
           collections.map((collection) => (
@@ -86,25 +86,25 @@ export default function CollectionsPage() {
 
       {/* 2. THE PHILOSOPHY STORY */}
       <Section
-        title="UNAPOLOGETIC MOVEMENT"
-        subtitle="THE PHILOSOPHY"
+        title="MOVIMIENTO SIN DISCULPAS"
+        subtitle="LA FILOSOFÍA"
         bg="charcoal"
       >
         <div className="max-w-2xl mx-auto text-center space-y-6">
           <p className="text-base md:text-lg text-neutral-300 font-sans font-light leading-relaxed tracking-wide">
-            Designed for the women who own the night. Our performancewear doesn&apos;t just support your rhythm; it amplifies it. From the studio to the club, Bombo is your second skin, engineered to express confidence and power.
+            Diseñado para las mujeres dueñas de la noche. Nuestra ropa de rendimiento no solo acompaña tu ritmo, lo amplifica. Del estudio al club, Bombo es tu segunda piel, diseñada para expresar confianza y poder.
           </p>
           <div className="flex justify-center items-center gap-3 text-brand-magenta font-display font-black text-xs tracking-widest pt-2">
             <Flame className="w-4 h-4 text-brand-magenta animate-pulse" />
-            <span>BUILT FOR THE SPOTLIGHT</span>
+            <span>CREADO PARA DESTACAR</span>
           </div>
         </div>
       </Section>
 
       {/* 3. SHOP THE MOOD / CATEGORIES */}
       <Section
-        title="SHOP THE MOOD"
-        subtitle="CATEGORIES"
+        title="COMPRA POR ESTADO DE ÁNIMO"
+        subtitle="CATEGORÍAS"
         bg="dark"
       >
         <div className="max-w-xl mx-auto divide-y divide-white/5 border-t border-b border-white/5">
@@ -130,16 +130,16 @@ export default function CollectionsPage() {
 
       {/* 4. SOCIAL PROOF VIDEO SECTION */}
       <Section
-        title="SEEN ON MOVEMENT"
-        subtitle="LIVE FROM SESSION HQ"
+        title="VISTO EN EL MOVIMIENTO"
+        subtitle="EN VIVO DESDE EL CUARTEL GENERAL"
         bg="plum"
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
           {[
-            { img: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=300', class: 'Waacking class' },
-            { img: 'https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=300', class: 'Heels session' },
-            { img: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=300', class: 'Pole workout' },
-            { img: 'https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?q=80&w=300', class: 'Atelier fitting' },
+            { img: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=300', class: 'Clase de Waacking' },
+            { img: 'https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=300', class: 'Sesión de Heels' },
+            { img: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=300', class: 'Entrenamiento de Pole' },
+            { img: 'https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?q=80&w=300', class: 'Prueba de Atelier' },
           ].map((item, idx) => (
             <div key={idx} className="relative aspect-[9/16] border border-white/5 overflow-hidden group rounded-xl">
               <img src={item.img} alt={item.class} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />

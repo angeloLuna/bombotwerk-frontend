@@ -44,6 +44,8 @@ export interface ProductFilters {
   availability?: string;
   sort?: string;
   search?: string;
+  featured?: boolean;
+  sale?: boolean;
 }
 
 /** GET /api/products */
@@ -56,6 +58,8 @@ export async function getProducts(filters?: ProductFilters): Promise<ApiProduct[
     if (filters.availability) params.append('availability', filters.availability);
     if (filters.sort) params.append('sort', filters.sort);
     if (filters.search) params.append('search', filters.search);
+    if (filters.featured) params.append('featured', 'true');
+    if (filters.sale) params.append('sale', 'true');
     const queryString = params.toString();
     if (queryString) {
       path += `?${queryString}`;
@@ -92,23 +96,50 @@ export async function getCollectionBySlug(slug: string): Promise<ApiCollection> 
  * `availabilityText` from the nested variants / media returned by the backend,
  * so existing UI components keep receiving the same flat props they expect.
  */
-function normaliseProduct(p: ApiProduct): ApiProduct {
-  const images =
-    p.media?.map((m) => m.url).filter(Boolean) ??
-    ['https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=800'];
+function normaliseProduct(p: any): ApiProduct {
+  const rawImages = p.images || [];
+  let imagesList: string[] = [];
 
+  if (Array.isArray(rawImages) && rawImages.length > 0) {
+    if (typeof rawImages[0] === 'object' && rawImages[0] !== null && 'url' in rawImages[0]) {
+      imagesList = rawImages.map((img: any) => img.url).filter(Boolean);
+    } else {
+      imagesList = rawImages.filter((img: any) => typeof img === 'string');
+    }
+  }
+
+  if (imagesList.length === 0 && p.media && p.media.length > 0) {
+    imagesList = p.media.map((m: any) => m.url).filter(Boolean);
+  }
+
+  if (imagesList.length === 0) {
+    imagesList = ['https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=800'];
+  }
+
+  const sizeOrder = ['xch', 'ch', 'm', 'g', 'xg'];
   const sizes = Array.from(
     new Set(
-      p.variants?.flatMap((v) =>
-        v.stocks?.map((s) => s.size).filter(Boolean),
+      p.variants?.flatMap((v: any) =>
+        v.stocks?.map((s: any) => s.size).filter(Boolean),
       ) ?? [],
-    ),
-  );
+    ) as Set<string>
+  ).sort((a, b) => {
+    const aIdx = sizeOrder.indexOf(a.toLowerCase());
+    const bIdx = sizeOrder.indexOf(b.toLowerCase());
+    if (aIdx === -1 && bIdx === -1) return a.localeCompare(b);
+    if (aIdx === -1) return 1;
+    if (bIdx === -1) return -1;
+    return aIdx - bIdx;
+  });
 
   // Derive best overall availability from variant stocks
-  const allStocks = p.variants?.flatMap((v) => v.stocks) ?? [];
-  const hasStock = allStocks.some((s) => s.quantity > 0);
-  const hasMTO = p.variants?.some((v) => v.madeToOrderEnabled);
+  const allStocks = p.variants?.flatMap((v: any) => v.stocks) ?? [];
+  const hasStock = allStocks.some((s: any) => s.quantity > 0);
+  const hasMTO = p.variants?.some(
+    (v: any) =>
+      v.availabilityMode === 'stock_and_made_to_order' ||
+      v.availabilityMode === 'made_to_order_only'
+  );
 
   let availability: ApiProduct['availability'] = 'limited-drop';
   let availabilityText = p.availabilityText || 'Agotado';
@@ -121,5 +152,5 @@ function normaliseProduct(p: ApiProduct): ApiProduct {
     availabilityText = p.availabilityText || 'Bajo pedido';
   }
 
-  return { ...p, images, sizes, availability, availabilityText };
+  return { ...p, images: imagesList, rawImages, sizes, availability, availabilityText };
 }

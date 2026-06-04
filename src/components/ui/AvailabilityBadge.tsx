@@ -14,21 +14,21 @@ const AvailabilityBadge: React.FC<AvailabilityBadgeProps> = ({
 }) => {
   const configs = {
     'ready-to-ship': {
-      label: text || 'Ships within 24h',
+      label: text || 'Envío inmediato (24h)',
       icon: Truck,
       dotColor: 'bg-brand-magenta',
       bgColor: 'bg-brand-magenta/5 border-brand-magenta/20',
       textColor: 'text-brand-magenta',
     },
     'crafted-cdmx': {
-      label: text || 'Crafted in CDMX — Ready in 5–7 days',
+      label: text || 'Confeccionado en CDMX — Listo en 5–7 días',
       icon: MapPin,
       dotColor: 'bg-brand-violet',
       bgColor: 'bg-brand-violet/5 border-brand-violet/20',
       textColor: 'text-brand-violet',
     },
     'limited-drop': {
-      label: text || 'Limited Drop',
+      label: text || 'Lanzamiento limitado',
       icon: Sparkles,
       dotColor: 'bg-brand-gold',
       bgColor: 'bg-brand-gold/5 border-brand-gold/20',

@@ -12,10 +12,13 @@ const BASE =
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const headers: any = {
-    'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
     ...opts?.headers,
   };
+
+  if (!(opts?.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
 
 
@@ -65,6 +68,50 @@ export const adminApi = {
       }),
     deactivate: (id: string) =>
       req<AdminProduct>(`/products/${id}`, { method: 'DELETE' }),
+    uploadImage: (productId: string, file: File, type?: string, alt?: string, sortOrder?: number, isCover?: boolean) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (type) formData.append('type', type);
+      if (alt) formData.append('alt', alt);
+      if (sortOrder !== undefined) formData.append('sortOrder', String(sortOrder));
+      if (isCover !== undefined) formData.append('isCover', String(isCover));
+      return req<any>(`/products/${productId}/images`, {
+        method: 'POST',
+        body: formData,
+      });
+    },
+    uploadRawImage: (productId: string, file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return req<{ url: string; key: string }>(`/products/${productId}/images/upload-raw`, {
+        method: 'POST',
+        body: formData,
+      });
+    },
+    bulkUpdateImages: (productId: string, body: { images: any[]; deletedImageIds: string[] }) =>
+      req<any[]>(`/products/${productId}/images/bulk`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    addImageUrl: (productId: string, body: { url: string; alt?: string; type?: string; isCover?: boolean; sortOrder?: number }) =>
+      req<any>(`/products/${productId}/images/url`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    updateImage: (productId: string, imageId: string, body: { alt?: string; type?: string; sortOrder?: number; isCover?: boolean }) =>
+      req<any>(`/products/${productId}/images/${imageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    reorderImages: (productId: string, ids: string[]) =>
+      req<any>(`/products/${productId}/images/reorder`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ids }),
+      }),
+    deleteImage: (productId: string, imageId: string) =>
+      req<any>(`/products/${productId}/images/${imageId}`, {
+        method: 'DELETE',
+      }),
   },
 
   collections: {
@@ -79,6 +126,14 @@ export const adminApi = {
         method: 'PATCH',
         body: JSON.stringify(body),
       }),
+    uploadImage: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return req<{ url: string; key: string }>('/collections/upload', {
+        method: 'POST',
+        body: formData,
+      });
+    },
   },
 
   orders: {
@@ -93,6 +148,14 @@ export const adminApi = {
       return req<AdminOrder[]>(`/orders${queryString ? `?${queryString}` : ''}`);
     },
     get: (id: string) => req<AdminOrder>(`/orders/${id}`),
+    resendEmail: (id: string) => req<{
+      success: boolean;
+      confirmationEmailStatus: string;
+      confirmationEmailSentAt: string | null;
+      confirmationEmailError: string | null;
+    }>(`/orders/${id}/resend-email`, {
+      method: 'POST',
+    }),
   },
 };
 

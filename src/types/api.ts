@@ -19,13 +19,32 @@ export interface Variant {
   id: string;
   sku: string;
   color: string | null;
-  madeToOrderEnabled: boolean;
+  availabilityMode: string;
+  madeToOrderMinDays?: number;
+  madeToOrderMaxDays?: number;
   stocks: SizeStock[];
 }
 
 export interface CollectionRef {
   name: string;
   slug: string;
+}
+
+export type ProductImageType = 'catalog' | 'editorial' | 'detail' | 'technical' | 'styling' | 'community';
+export type ProductImageView = 'front' | 'back' | 'side' | 'detail' | 'not_applicable';
+
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  key: string | null;
+  alt: string | null;
+  type: ProductImageType;
+  view: ProductImageView;
+  sortOrder: number;
+  isCover: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ApiProduct {
@@ -37,11 +56,14 @@ export interface ApiProduct {
   category: string;
   isActive: boolean;
   isNewArrival: boolean;
+  isFeatured: boolean;
+  compareAtPrice?: number | null;
   variants: Variant[];
   media: MediaItem[];
+  images: string[];        // extracted from media[].url
+  rawImages?: ProductImage[]; // raw images from R2/DB
   collection: CollectionRef | null;
   // Convenience fields derived client-side by normaliseProduct()
-  images: string[];        // extracted from media[].url
   sizes: string[];         // extracted from variants[].stocks[].size
   availability: 'ready-to-ship' | 'crafted-cdmx' | 'limited-drop';
   availabilityText: string;
@@ -54,5 +76,7 @@ export interface ApiCollection {
   description: string;
   tagline: string;
   bgImage: string | null;
+  coverImageUrl?: string | null;
+  heroImageUrl?: string | null;
   products?: ApiProduct[];
 }

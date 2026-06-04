@@ -19,7 +19,7 @@ function totalStock(p: AdminProduct): number {
 }
 
 function hasMTO(p: AdminProduct): boolean {
-  return p.variants.some((v) => v.madeToOrderEnabled);
+  return p.variants.some((v) => v.availabilityMode === 'stock_and_made_to_order' || v.availabilityMode === 'made_to_order_only');
 }
 
 export default function AdminProductsPage() {

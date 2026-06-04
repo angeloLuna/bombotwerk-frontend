@@ -8,11 +8,11 @@ interface WhatsAppAssistProps {
 }
 
 const WhatsAppAssist: React.FC<WhatsAppAssistProps> = ({
-  text = 'Need help choosing your fit?',
-  linkText = 'Chat with a stylist.',
+  text = '¿Necesitas ayuda para elegir tu talla?',
+  linkText = 'Chatea con un estilista.',
   className = '',
 }) => {
-  const message = encodeURIComponent("Hello! I'm browsing the Bombo Twerk store and would love some styling and sizing advice.");
+  const message = encodeURIComponent("¡Hola! Estoy navegando en la tienda de Bombo Twerk y me gustaría recibir asesoría sobre tallas y estilos.");
   const waUrl = `https://wa.me/5215555555555?text=${message}`;
 
   return (

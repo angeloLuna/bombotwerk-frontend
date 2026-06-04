@@ -14,8 +14,8 @@ interface ErrorStateProps {
  * Branded error state card using the magenta border system.
  */
 export default function ErrorState({
-  title = 'CONNECTION ERROR',
-  message = 'We could not load the data right now. The server may be unavailable.',
+  title = 'ERROR DE CONEXIÓN',
+  message = 'No pudimos cargar los datos en este momento. Es posible que el servidor no esté disponible.',
   actionLabel,
   actionHref,
   onRetry,
@@ -44,7 +44,7 @@ export default function ErrorState({
             onClick={onRetry}
             className="flex items-center gap-2 text-[10px] tracking-widest font-display font-black text-white border-b border-white/20 pb-1 hover:border-white transition-colors"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> RETRY
+            <RefreshCw className="w-3.5 h-3.5" /> REINTENTAR
           </button>
         )}
         {actionLabel && actionHref && (

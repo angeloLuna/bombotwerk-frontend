@@ -7,7 +7,7 @@ import Price from '@/components/ui/Price';
 import Button from '@/components/ui/Button';
 import WhatsAppAssist from '@/components/ui/WhatsAppAssist';
 import { PRODUCTS } from '@/data/placeholder';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, ArrowLeft, AlertTriangle, Clock } from 'lucide-react';
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, cartTotal, cartCount, addToCart } = useCart();
@@ -17,19 +17,47 @@ export default function CartPage() {
     (p) => p.category === 'ACCESSORIES' || p.category === 'FOOTWEAR'
   ).slice(0, 2);
 
+  // Helper to determine if an item is made to order
+  const isItemMadeToOrder = (item: any) => {
+    const variant = item.product.variants?.find((v: any) =>
+      v.stocks?.some((s: any) => s.size === item.selectedSize)
+    ) || item.product.variants?.[0];
+    const stockEntry = variant?.stocks?.find((s: any) => s.size === item.selectedSize);
+    const stockQty = stockEntry ? stockEntry.quantity : 0;
+
+    if (variant) {
+      if (variant.availabilityMode === 'made_to_order_only') {
+        return true;
+      }
+      if (variant.availabilityMode === 'stock_and_made_to_order') {
+        return stockQty < item.quantity;
+      }
+    }
+    return false;
+  };
+
+  const hasInStock = cart.some(item => !isItemMadeToOrder(item));
+  const hasMadeToOrder = cart.some(item => isItemMadeToOrder(item));
+  const isMixed = hasInStock && hasMadeToOrder;
+
+  const isFreeShipping = cartTotal >= 1000;
+  const shippingCost = isFreeShipping ? 0 : 150;
+  const total = cartTotal + shippingCost;
+  const amountForFreeShipping = Math.max(0, 1000 - cartTotal);
+
   if (cart.length === 0) {
     return (
       <div className="w-full min-h-[70vh] flex flex-col items-center justify-center bg-brand-dark px-4 space-y-6">
         <div className="w-16 h-16 rounded-full bg-brand-charcoal flex items-center justify-center border border-white/5">
           <ShoppingBag className="w-6 h-6 text-neutral-500" />
         </div>
-        <h1 className="font-serif text-3xl text-neutral-400">YOUR ARSENAL IS EMPTY</h1>
+        <h1 className="font-serif text-3xl text-neutral-400">TU ARSENAL ESTÁ VACÍO</h1>
         <p className="text-sm text-neutral-500 font-sans text-center max-w-sm">
-          You haven&apos;t added any performancewear to your selection yet. Complete your energy by exploring our drops.
+          Aún no has añadido prendas de rendimiento a tu selección. Completa tu energía explorando nuestros drops.
         </p>
-        <Link href="/collections">
+        <Link href="/colecciones">
           <Button variant="primary" size="md">
-            EXPLORE DROPS
+            EXPLORAR DROPS
           </Button>
         </Link>
       </div>
@@ -43,10 +71,10 @@ export default function CartPage() {
         {/* Editorial Heading */}
         <div className="space-y-2 border-b border-white/5 pb-6">
           <span className="text-[10px] tracking-widest font-display text-brand-magenta font-black">
-            YOUR CURATED SELECTION
+            TU SELECCIÓN CURADA
           </span>
           <h1 className="text-4xl md:text-5xl font-serif text-white tracking-wide uppercase">
-            TONIGHT&apos;S <span className="italic font-normal text-brand-magenta text-glow-magenta">ENERGY</span>
+            LA ENERGÍA <span className="italic font-normal text-brand-magenta text-glow-magenta">DE ESTA NOCHE</span>
           </h1>
         </div>
 
@@ -79,13 +107,43 @@ export default function CartPage() {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                  <span className="text-[10px] text-brand-magenta font-semibold tracking-wider block">
-                    {item.product.availabilityText.toUpperCase()}
-                  </span>
+                  {(() => {
+                    const variant = item.product.variants?.find((v) =>
+                      v.stocks?.some((s) => s.size === item.selectedSize)
+                    ) || item.product.variants?.[0];
+                    const stockEntry = variant?.stocks?.find((s) => s.size === item.selectedSize);
+                    const stockQty = stockEntry ? stockEntry.quantity : 0;
+                    let text = item.product.availabilityText || 'Agotado';
+
+                    if (variant) {
+                      if (variant.availabilityMode === 'discontinued') {
+                        text = 'Descontinuado';
+                      } else if (variant.availabilityMode === 'made_to_order_only') {
+                        text = `Hecho bajo pedido · Listo en ${variant.madeToOrderMinDays ?? 7}–${variant.madeToOrderMaxDays ?? 9} días`;
+                      } else if (variant.availabilityMode === 'stock_and_made_to_order') {
+                        if (stockQty > 0) {
+                          text = 'Envío inmediato (Stock)';
+                        } else {
+                          text = `Bajo pedido · Listo en ${variant.madeToOrderMinDays ?? 7}–${variant.madeToOrderMaxDays ?? 9} días`;
+                        }
+                      } else if (variant.availabilityMode === 'stock_only') {
+                        if (stockQty > 0) {
+                          text = 'Envío inmediato (Stock)';
+                        } else {
+                          text = 'Agotado';
+                        }
+                      }
+                    }
+                    return (
+                      <span className="text-[10px] text-brand-magenta font-semibold tracking-wider block uppercase">
+                        {text}
+                      </span>
+                    );
+                  })()}
                   
                   {/* Selected Size Badge */}
                   <div className="inline-block border border-white/10 px-2 py-0.5 text-[10px] font-display font-bold tracking-widest text-neutral-400">
-                    SIZE: {item.selectedSize.toUpperCase()}
+                    TALLA: {item.selectedSize.toUpperCase()}
                   </div>
                 </div>
 
@@ -119,14 +177,14 @@ export default function CartPage() {
 
         {/* WhatsApp styling advice assist */}
         <WhatsAppAssist 
-          text="Need help choosing your sizing or timing before checking out?" 
-          linkText="Ask an Atelier Stylist"
+          text="¿Necesitas ayuda para elegir tu talla o tiempos antes de pagar?" 
+          linkText="Pregunta a un Estilista del Atelier"
         />
 
         {/* COMPLETE THE LOOK ACCESORIES RECOMMENDED */}
         <div className="pt-6 border-t border-white/5">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="font-serif text-2xl tracking-wide uppercase text-white">COMPLETE THE LOOK</h2>
+            <h2 className="font-serif text-2xl tracking-wide uppercase text-white">COMPLETA EL LOOK</h2>
             <ArrowRight className="w-5 h-5 text-brand-magenta" />
           </div>
           
@@ -149,11 +207,11 @@ export default function CartPage() {
                   <button
                     onClick={() => {
                       addToCart(item as any, item.sizes[0], 1);
-                      alert(`Added ${item.name} (Size: ${item.sizes[0]}) to your selection.`);
+                      alert(`Añadido ${item.name} (Talla: ${item.sizes[0]}) a tu arsenal.`);
                     }}
                     className="w-full border border-white/10 hover:border-brand-magenta hover:bg-brand-magenta/5 text-[10px] tracking-widest font-display font-black text-white hover:text-brand-magenta py-2 transition-all duration-300 uppercase"
                   >
-                    + ADD TO LOOK
+                    + AÑADIR AL LOOK
                   </button>
                 </div>
               </div>
@@ -161,27 +219,86 @@ export default function CartPage() {
           </div>
         </div>
 
+        {/* Shipping & Production Notices */}
+        <div className="space-y-3">
+          {/* Free Shipping Progress Alert */}
+          {!isFreeShipping ? (
+            <div className="bg-brand-gold/10 border border-brand-gold/20 p-4 rounded-xl text-xs text-brand-gold font-sans flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-brand-gold" />
+                <span>Agrega más prendas para obtener envío gratis.</span>
+              </div>
+              <span>Faltan <Price amount={amountForFreeShipping} className="font-bold inline-block" /></span>
+            </div>
+          ) : (
+            <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl text-xs text-green-400 font-sans flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 shrink-0 text-green-400" />
+              <span>Tu pedido califica para envío gratis.</span>
+            </div>
+          )}
+
+          {/* Mixed Cart Notice */}
+          {isMixed && (
+            <div className="bg-brand-magenta/5 border border-brand-magenta/20 p-4 rounded-xl text-xs text-neutral-300 font-sans flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-brand-magenta shrink-0 mt-0.5" />
+              <span>Tu pedido combina piezas disponibles y piezas bajo demanda. Enviaremos tu pedido completo cuando todas las piezas estén listas.</span>
+            </div>
+          )}
+
+          {/* Delivery estimate description */}
+          <div className="bg-brand-charcoal border border-white/5 p-4 rounded-xl text-xs text-neutral-300 font-sans space-y-1">
+            <div className="flex items-center gap-2 font-semibold text-white">
+              <Clock className="w-4 h-4 text-brand-magenta shrink-0" />
+              {isMixed ? (
+                <span>Entrega estimada: 9 a 14 días hábiles.</span>
+              ) : hasMadeToOrder ? (
+                <span>Entrega estimada: 9 a 14 días hábiles.</span>
+              ) : (
+                <span>Entrega estimada: 2 a 5 días hábiles.</span>
+              )}
+            </div>
+            {hasMadeToOrder && (
+              <p className="text-[10px] text-neutral-400 ml-6">
+                {isMixed
+                  ? 'El pedido completo se procesará según los tiempos de fabricación de las piezas bajo demanda.'
+                  : 'Incluye 7 a 9 días hábiles de fabricación y 2 a 5 días hábiles de envío.'}
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* Bottom Cart Summary Layout */}
         <div className="bg-brand-charcoal border border-white/5 p-6 rounded-2xl space-y-6">
-          <div className="flex justify-between items-center text-xs tracking-widest">
-            <span className="text-neutral-400 font-display">TOTAL ENERGY</span>
-            <Price amount={cartTotal} className="text-xl font-black text-white" />
+          <div className="space-y-3 border-b border-white/5 pb-4 text-xs font-sans">
+            <div className="flex justify-between text-neutral-400">
+              <span>SUBTOTAL PRENDAS</span>
+              <Price amount={cartTotal} />
+            </div>
+            <div className="flex justify-between text-neutral-400">
+              <span>ENVÍO ESTÁNDAR</span>
+              {shippingCost > 0 ? (
+                <Price amount={shippingCost} />
+              ) : (
+                <span className="text-brand-gold font-bold uppercase tracking-wider text-[10px]">Gratis</span>
+              )}
+            </div>
           </div>
-          <div className="flex justify-between items-center text-[10px] tracking-widest border-t border-white/5 pt-4">
-            <span className="text-neutral-400 font-display">EST. SHIPPING</span>
-            <span className="text-brand-gold font-bold">COMPLIMENTARY</span>
+
+          <div className="flex justify-between items-center text-xs tracking-widest">
+            <span className="text-neutral-400 font-display">TOTAL ESTIMADO</span>
+            <Price amount={total} className="text-xl font-black text-white" />
           </div>
 
           <div className="pt-2">
             <Link href="/checkout">
               <Button variant="primary" fullWidth size="lg" className="shadow-magenta-glow">
-                SECURE THE LOOK <ArrowRight className="w-4 h-4 ml-2" />
+                PROCEDER AL PAGO <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
           </div>
           <div className="text-center">
-            <Link href="/collections" className="inline-flex items-center gap-1.5 text-[10px] tracking-widest font-display font-bold text-neutral-400 hover:text-brand-magenta transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" /> CONTINUE EXPLORING
+            <Link href="/colecciones" className="inline-flex items-center gap-1.5 text-[10px] tracking-widest font-display font-bold text-neutral-400 hover:text-brand-magenta transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" /> SEGUIR EXPLORANDO
             </Link>
           </div>
         </div>

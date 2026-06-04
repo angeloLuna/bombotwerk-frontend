@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { getProducts } from '@/lib/api';
 import type { ApiProduct } from '@/types/api';
 import ProductCard from '@/components/ui/ProductCard';
@@ -11,12 +12,11 @@ import { Sparkles, SlidersHorizontal, Search } from 'lucide-react';
 
 const CATEGORIES = [
   { label: 'Todos', value: null },
-  { label: 'Básicos', value: 'Básicos' },
-  { label: 'Falda mesh', value: 'Falda mesh' },
-  { label: 'Estampados', value: 'Cacheteros estampados' },
-  { label: 'Sets', value: 'Sets' },
-  { label: 'Tops', value: 'Tops' },
-  { label: 'Accesorios', value: 'Accesorios' },
+  { label: 'Cacheteros', value: 'cacheteros' },
+  { label: 'Bodys', value: 'bodys' },
+  { label: 'Conjuntos', value: 'conjuntos' },
+  { label: 'Faldas y flecos', value: 'faldas-flecos' },
+  { label: 'Arneses', value: 'arneses' },
 ];
 
 const AVAILABILITIES = [
@@ -30,7 +30,8 @@ const SORT_OPTIONS = [
   { label: 'Precio mayor', value: 'price_desc' },
 ];
 
-export default function ShopPage() {
+function ShopContent() {
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,29 @@ export default function ShopPage() {
   const [selectedAvailability, setSelectedAvailability] = useState<string | null>(null);
   const [selectedSort, setSelectedSort] = useState<string>('recent');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedSale, setSelectedSale] = useState<boolean>(false);
+
+  // Handle URL parameters for category, sale, and sort
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    if (categoryParam) {
+      setSelectedCategory(categoryParam.toLowerCase());
+    } else {
+      setSelectedCategory(null);
+    }
+
+    const saleParam = searchParams.get('sale');
+    if (saleParam === 'true') {
+      setSelectedSale(true);
+    } else {
+      setSelectedSale(false);
+    }
+
+    const sortParam = searchParams.get('sort');
+    if (sortParam && ['recent', 'price_asc', 'price_desc'].includes(sortParam)) {
+      setSelectedSort(sortParam);
+    }
+  }, [searchParams]);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -50,6 +74,7 @@ export default function ShopPage() {
         availability: selectedAvailability ?? undefined,
         sort: selectedSort,
         search: searchQuery || undefined,
+        sale: selectedSale || undefined,
       });
       setProducts(data);
     } catch (e: any) {
@@ -57,7 +82,7 @@ export default function ShopPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, selectedAvailability, selectedSort, searchQuery]);
+  }, [selectedCategory, selectedAvailability, selectedSort, searchQuery, selectedSale]);
 
   // Debounced fetch to handle search typing smoothly
   useEffect(() => {
@@ -80,7 +105,7 @@ export default function ShopPage() {
           TODO EL <span className="italic font-normal text-brand-magenta text-glow-magenta">MOVIMIENTO</span>
         </h1>
         <p className="text-xs md:text-sm text-neutral-400 font-sans font-light max-w-xl mx-auto tracking-wide leading-relaxed">
-          Explora piezas diseñadas para moverse contigo: básicos, mesh, estampados y drops limitados.
+          Explora piezas diseñadas para moverse contigo: cacheteros, bodys, conjuntos, arneses y faldas.
         </p>
         <div className="w-10 h-[1px] bg-brand-magenta/60 mx-auto mt-4" />
       </section>
@@ -142,10 +167,10 @@ export default function ShopPage() {
 
           {/* Availability & Sorting Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-white/5">
-            {/* Availability pills */}
+            {/* Availability & Sales pills */}
             <div className="space-y-2">
-              <span className="block text-[10px] font-display font-bold tracking-widest text-neutral-500 uppercase">Disponibilidad</span>
-              <div className="flex gap-2">
+              <span className="block text-[10px] font-display font-bold tracking-widest text-neutral-500 uppercase">Disponibilidad y Ofertas</span>
+              <div className="flex flex-wrap gap-2">
                 {AVAILABILITIES.map((av) => {
                   const isActive = selectedAvailability === av.value;
                   return (
@@ -162,6 +187,16 @@ export default function ShopPage() {
                     </button>
                   );
                 })}
+                <button
+                  onClick={() => setSelectedSale(!selectedSale)}
+                  className={`px-4 py-2 border rounded-full text-xs font-display tracking-widest uppercase whitespace-nowrap transition-all duration-300 ${
+                    selectedSale
+                      ? 'bg-brand-magenta border-brand-magenta text-black shadow-magenta-glow font-black'
+                      : 'border-brand-magenta/30 text-brand-magenta bg-transparent hover:border-brand-magenta/80'
+                  }`}
+                >
+                  % Ofertas y Últimas Piezas
+                </button>
               </div>
             </div>
 
@@ -218,6 +253,7 @@ export default function ShopPage() {
                   setSelectedAvailability(null);
                   setSearchQuery('');
                   setSelectedSort('recent');
+                  setSelectedSale(false);
                 }}
                 className="text-xs font-display font-bold tracking-widest text-brand-magenta hover:text-white transition-colors uppercase underline"
               >
@@ -238,5 +274,13 @@ export default function ShopPage() {
         )}
       </section>
     </div>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner message="CARGANDO TIENDA..." />}>
+      <ShopContent />
+    </Suspense>
   );
 }

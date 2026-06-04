@@ -19,6 +19,8 @@ import {
   CreditCard,
   History,
   FileCode,
+  Mail,
+  Check,
 } from 'lucide-react';
 
 interface OrderDetailPageProps {
@@ -49,6 +51,10 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
+  const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
@@ -58,6 +64,28 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
       .catch((e) => setError(e.message ?? 'Error al cargar el detalle de la orden.'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleResendEmail = async () => {
+    if (!order) return;
+    setSendingEmail(true);
+    setEmailSuccessMsg(null);
+    setEmailErrorMsg(null);
+    try {
+      const res = await adminApi.orders.resendEmail(order.id);
+      if (res.success) {
+        setEmailSuccessMsg('Correo de confirmación enviado con éxito.');
+      } else {
+        setEmailErrorMsg(res.confirmationEmailError || 'El envío del correo falló.');
+      }
+      // Refresh order data to get latest DB fields
+      const updated = await adminApi.orders.get(order.id);
+      setOrder(updated);
+    } catch (err: any) {
+      setEmailErrorMsg(err.message || 'Error al conectar con la API de reenvío.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -195,27 +223,97 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
             <div className="bg-brand-charcoal border border-white/5 p-5 rounded-xl space-y-4">
               <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-brand-magenta" />
-                DESTINO DE ENVÍO
+                LOGÍSTICA Y DESTINO DE ENVÍO
               </h3>
               <div className="text-xs space-y-3">
                 <div className="space-y-1">
-                  <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Dirección</span>
+                  <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Dirección de Entrega</span>
                   <span className="text-neutral-200 font-light">{order.shippingAddress}</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-white/5 pt-3">
                   <div className="space-y-1">
-                    <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Método</span>
+                    <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Método de Envío</span>
                     <span className="text-white uppercase font-mono text-[10px]">
-                      {order.shippingMethod === 'express' ? 'Express (1-2 Días)' : 'CDMX Confección (4-6 Días)'}
+                      {order.shippingLabel || order.shippingMethod || 'Estándar'}
                     </span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Costo Envío</span>
+                    <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Envío Gratis</span>
+                    <span className={`font-mono text-[10px] font-bold ${order.isFreeShipping ? 'text-brand-gold' : 'text-neutral-400'}`}>
+                      {order.isFreeShipping ? 'SÍ (Compra >= $1000 MXN)' : 'NO'}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Costo Envío Estándar</span>
                     <span className="text-white font-mono">
-                      {order.shippingTotal > 0 ? <Price amount={order.shippingTotal} /> : 'GRATIS'}
+                      {order.shippingCost !== undefined ? (
+                        order.shippingCost > 0 ? <Price amount={order.shippingCost} /> : 'GRATIS'
+                      ) : (
+                        order.shippingTotal > 0 ? <Price amount={order.shippingTotal} /> : 'GRATIS'
+                      )}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Envío Dividido</span>
+                    <span className="text-white font-mono uppercase text-[10px]">
+                      {order.splitShippingSelected ? (
+                        <span className="text-brand-magenta font-bold">SÍ (+ <Price amount={order.splitShippingCost ?? 150} />)</span>
+                      ) : 'NO'}
                     </span>
                   </div>
                 </div>
+
+                <div className="border-t border-white/5 pt-3 space-y-2">
+                  <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Composición del Carrito</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {order.hasInStockItems && (
+                      <span className="text-[8px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-display font-bold">
+                        Contiene Stock disponible
+                      </span>
+                    )}
+                    {order.hasMadeToOrderItems && (
+                      <span className="text-[8px] bg-brand-magenta/10 text-brand-magenta border border-brand-magenta/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-display font-bold">
+                        Contiene piezas bajo demanda
+                      </span>
+                    )}
+                    {order.isMixedFulfillmentCart && (
+                      <span className="text-[8px] bg-brand-gold/10 text-brand-gold border border-brand-gold/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-display font-bold">
+                        Cargamento Mixto (Stock + Bajo Demanda)
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-white/5 pt-3 space-y-2">
+                  <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Estimaciones de Entrega</span>
+                  {order.splitShippingSelected ? (
+                    <div className="bg-brand-dark/30 p-3 rounded-lg border border-white/5 space-y-2 text-[10px] font-mono">
+                      <div>
+                        <p className="font-bold text-white uppercase text-[9px]">Paquete 1 (Piezas Disponibles):</p>
+                        <p className="text-neutral-400">{order.firstPackageEstimatedMinBusinessDays ?? 2} a {order.firstPackageEstimatedMaxBusinessDays ?? 5} días hábiles.</p>
+                      </div>
+                      <div className="border-t border-white/5 pt-2">
+                        <p className="font-bold text-white uppercase text-[9px]">Paquete 2 (Piezas Bajo Demanda):</p>
+                        <p className="text-neutral-400">{order.secondPackageEstimatedMinBusinessDays ?? 9} a {order.secondPackageEstimatedMaxBusinessDays ?? 14} días hábiles.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-brand-dark/30 p-3 rounded-lg border border-white/5 space-y-1 text-[10px] font-mono">
+                      <p className="text-neutral-400">
+                        Entrega estimada general: <span className="text-white font-bold">{order.estimatedDeliveryMinBusinessDays ?? 2} a {order.estimatedDeliveryMaxBusinessDays ?? 14} días hábiles.</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {(order.fulfillmentNotes || order.shippingNotes) && (
+                  <div className="border-t border-white/5 pt-3 space-y-1.5 bg-black/20 p-3 rounded-lg">
+                    <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Notas de Cumplimiento / Envío</span>
+                    {order.fulfillmentNotes && <p className="text-[10px] text-neutral-300 font-sans italic">{order.fulfillmentNotes}</p>}
+                    {order.shippingNotes && <p className="text-[10px] text-neutral-400 font-sans leading-none">{order.shippingNotes}</p>}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -242,7 +340,18 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                     <tr key={item.id} className="text-white">
                       <td className="py-3">
                         <p className="font-semibold">{item.productName || 'Producto sin nombre'}</p>
-                        <p className="text-[9px] text-neutral-500 font-mono uppercase">{item.variantName || 'Estándar'}</p>
+                        <div className="flex flex-wrap gap-1.5 items-center mt-1">
+                          <span className="text-[9px] text-neutral-500 font-mono uppercase">{item.variantName || 'Estándar'}</span>
+                          {item.fulfillmentType === 'made_to_order' ? (
+                            <span className="text-[8px] bg-brand-magenta/10 text-brand-magenta border border-brand-magenta/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-display font-bold">
+                              Bajo pedido ({item.madeToOrderMinDays ?? 7}-{item.madeToOrderMaxDays ?? 9} días)
+                            </span>
+                          ) : (
+                            <span className="text-[8px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-display font-bold">
+                              Stock inmediato
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="text-center py-3 font-mono font-bold text-neutral-400">
                         {item.size || 'N/A'}
@@ -269,9 +378,15 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 <Price amount={order.subtotal} className="font-mono" />
               </div>
               <div className="flex justify-between text-neutral-400">
-                <span>COSTO ENVÍO</span>
-                <Price amount={order.shippingTotal} className="font-mono" />
+                <span>ENVÍO ESTÁNDAR</span>
+                <Price amount={order.shippingCost !== undefined ? order.shippingCost : order.shippingTotal} className="font-mono" />
               </div>
+              {order.splitShippingSelected && (
+                <div className="flex justify-between text-neutral-400 animate-fade-in">
+                  <span>ENVÍO DIVIDIDO</span>
+                  <Price amount={order.splitShippingCost ?? 150} className="font-mono" />
+                </div>
+              )}
               <div className="flex justify-between text-white font-bold border-t border-white/5 pt-3 text-sm">
                 <span className="font-display tracking-widest text-neutral-400">TOTAL ORDEN</span>
                 <Price amount={order.total} className="text-lg text-brand-magenta font-black font-mono" />
@@ -362,6 +477,101 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 Sin datos de transacción de pago registrados.
               </div>
             )}
+          </div>
+
+          {/* Email Confirmation Control Card */}
+          <div className="bg-brand-charcoal border border-white/5 p-5 rounded-xl space-y-4">
+            <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-brand-magenta" />
+              COMPROBANTE DIGITAL DE COMPRA
+            </h3>
+            
+            <div className="text-xs space-y-3 font-sans">
+              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                <span className="text-neutral-400">Estado de Envío:</span>
+                <div>
+                  {order.confirmationEmailStatus === 'sent' ? (
+                    <span className="inline-flex items-center gap-1 bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded uppercase text-[9px] font-bold">
+                      <Check className="w-3 h-3" /> Enviado
+                    </span>
+                  ) : order.confirmationEmailStatus === 'failed' ? (
+                    <span className="inline-flex items-center gap-1 bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded uppercase text-[9px] font-bold">
+                      <XCircle className="w-3 h-3" /> Fallido
+                    </span>
+                  ) : order.confirmationEmailStatus === 'sending' ? (
+                    <span className="inline-flex items-center gap-1 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 px-2 py-0.5 rounded uppercase text-[9px] font-bold animate-pulse">
+                      <Clock className="w-3 h-3" /> Enviando...
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 bg-neutral-500/10 text-neutral-400 border border-neutral-500/20 px-2 py-0.5 rounded uppercase text-[9px] font-bold">
+                      <Clock className="w-3 h-3" /> No Enviado
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {order.confirmationEmailSentAt && (
+                <div className="flex justify-between border-b border-white/5 pb-2 text-xs">
+                  <span className="text-neutral-400">Enviado el:</span>
+                  <span className="text-white font-mono">
+                    {new Date(order.confirmationEmailSentAt).toLocaleString('es-MX', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+              )}
+
+              {order.confirmationEmailError && (
+                <div className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg space-y-1">
+                  <span className="text-[9px] text-red-400 font-bold uppercase tracking-wider block">Último Error Registrado:</span>
+                  <p className="text-[10px] text-neutral-400 font-mono break-all leading-normal">
+                    {order.confirmationEmailError}
+                  </p>
+                </div>
+              )}
+
+              {/* Status messages for user action */}
+              {emailSuccessMsg && (
+                <div className="bg-green-500/10 border border-green-500/20 p-2.5 rounded-lg text-green-400 text-[10px] font-medium">
+                  {emailSuccessMsg}
+                </div>
+              )}
+              {emailErrorMsg && (
+                <div className="bg-red-500/10 border border-red-500/20 p-2.5 rounded-lg text-red-400 text-[10px] font-medium break-all">
+                  {emailErrorMsg}
+                </div>
+              )}
+
+              <Button
+                variant="primary"
+                fullWidth
+                size="sm"
+                onClick={handleResendEmail}
+                disabled={sendingEmail || order.status !== 'paid'}
+                className="shadow-magenta-glow text-[10px] tracking-widest font-display font-black uppercase flex items-center justify-center gap-1.5 py-2.5"
+              >
+                {sendingEmail ? (
+                  <>
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-dark/20 border-t-brand-dark animate-spin" />
+                    ENVIANDO...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-3.5 h-3.5" />
+                    REENVIAR COMPROBANTE
+                  </>
+                )}
+              </Button>
+              {order.status !== 'paid' && (
+                <p className="text-[9px] text-neutral-500 text-center italic font-sans">
+                  * Solo se pueden enviar comprobantes de órdenes con pago aprobado ("paid").
+                </p>
+              )}
+            </div>
           </div>
 
           {/* B. Email Receipt Mockup Preview */}

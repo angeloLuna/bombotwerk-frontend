@@ -15,7 +15,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
   variant = 'card',
 }) => {
   const { name, slug, tagline, description } = collection;
-  const bgImage = collection.bgImage ?? 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=1000';
+  const bgImage = collection.coverImageUrl ?? collection.bgImage ?? collection.heroImageUrl ?? 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=1000';
 
   if (variant === 'banner') {
     return (
@@ -37,7 +37,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
             &ldquo;{tagline}&rdquo; — {description}
           </p>
           <div className="pt-4">
-            <Link href={`/collections/${slug}`}>
+            <Link href={`/colecciones/${slug}`}>
               <Button variant="primary" size="md">
                 SHOP COLLECTION
               </Button>
@@ -69,7 +69,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({
           {description}
         </p>
         <div className="pt-2">
-          <Link href={`/collections/${slug}`} className="inline-block">
+          <Link href={`/colecciones/${slug}`} className="inline-block">
             <span className="text-xs font-display font-black tracking-widest text-brand-magenta hover:text-white transition-colors border-b border-brand-magenta/40 pb-0.5">
               EXPLORE DROP →
             </span>

@@ -21,7 +21,7 @@ const StickyCTA: React.FC<StickyCTAProps> = ({
       <div className="max-w-md mx-auto flex items-center gap-4 justify-between md:flex-col md:items-stretch">
         {price !== undefined && (
           <div className="flex flex-col md:hidden">
-            <span className="text-[10px] text-neutral-400 tracking-wider">PRICE</span>
+            <span className="text-[10px] text-neutral-400 tracking-wider">PRECIO</span>
             <span className="text-lg font-bold">${price.toLocaleString()} MXN</span>
           </div>
         )}

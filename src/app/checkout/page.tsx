@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSession, signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
 import Price from '@/components/ui/Price';
@@ -19,6 +20,7 @@ const Payment = dynamic(
 export default function CheckoutPage() {
   const { cart, cartTotal, clearCart } = useCart();
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   // Inputs state
   const [name, setName] = useState('');
@@ -27,8 +29,24 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
-  const [shippingMethod, setShippingMethod] = useState<'express' | 'crafted'>('crafted');
+  const [splitShippingSelected, setSplitShippingSelected] = useState(false);
+  const [shippingCalc, setShippingCalc] = useState<any>(null);
+  const [calcLoading, setCalcLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'mercadopago' | 'card'>('mercadopago');
+  const [isGuest, setIsGuest] = useState(false);
+
+  useEffect(() => {
+    if (session?.user) {
+      if (session.user.name && !name) {
+        setName(session.user.name);
+      }
+      if (session.user.email && !email) {
+        setEmail(session.user.email);
+      }
+    }
+  }, [session, name, email]);
+
+  const showLoginCard = status !== 'authenticated' && !isGuest;
 
   // Checkout success state
   const [orderSecured, setOrderSecured] = useState(false);
@@ -48,6 +66,48 @@ export default function CheckoutPage() {
     }
   }, []);
 
+  // Fetch backend-calculated shipping pricing and estimates
+  useEffect(() => {
+    if (cart.length === 0) return;
+
+    const fetchCalculation = async () => {
+      setCalcLoading(true);
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:4000';
+        const response = await fetch(`${backendUrl}/api/checkout/calculate-shipping`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: JSON.stringify({
+            cartItems: cart.map(item => ({
+              productId: item.product.id,
+              variantId: getVariantIdForSize(item.product, item.selectedSize),
+              size: item.selectedSize,
+              quantity: item.quantity
+            })),
+            splitShippingSelected,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setShippingCalc(data);
+        } else {
+          const errorText = await response.text();
+          console.error('Failed to fetch shipping calculation:', errorText);
+        }
+      } catch (err) {
+        console.error('Error fetching shipping calculation:', err);
+      } finally {
+        setCalcLoading(false);
+      }
+    };
+
+    fetchCalculation();
+  }, [cart, splitShippingSelected]);
+
   // Helper to find variant matching a selected size
   const getVariantIdForSize = (product: any, size: string) => {
     if (!product.variants || product.variants.length === 0) return null;
@@ -66,6 +126,7 @@ export default function CheckoutPage() {
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
+          ...(session?.backendToken ? { 'Authorization': `Bearer ${session.backendToken}` } : {}),
         },
         body: JSON.stringify({
           formData,
@@ -80,7 +141,8 @@ export default function CheckoutPage() {
             address,
             city,
             zip,
-            method: shippingMethod,
+            method: 'standard',
+            splitShippingSelected: shippingCalc ? shippingCalc.splitShippingSelected : false,
           },
           email,
           phone,
@@ -97,24 +159,22 @@ export default function CheckoutPage() {
       }
 
       if (!response.ok) {
-        throw new Error(result.message || 'Payment processing failed');
+        throw new Error(result.message || 'El procesamiento del pago falló');
       }
 
       clearCart();
       router.push(`/checkout/result?orderId=${result.orderId}`);
     } catch (error: any) {
       console.error('Payment processing failed:', error);
-      alert(`Error: ${error.message || 'An error occurred during payment. Please try again.'}`);
+      alert(`Error: ${error.message || 'Ocurrió un error durante el pago. Por favor, inténtalo de nuevo.'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const shippingCost = shippingMethod === 'express' ? 250 : 0; // 250 MXN for express
-  const checkoutTotal = cartTotal + shippingCost;
-
+  const amountToCharge = shippingCalc ? shippingCalc.total : cartTotal + 150;
   const initialization = React.useMemo(() => {
-    const amountVal = Number(checkoutTotal);
+    const amountVal = Number(amountToCharge);
     return {
       amount: isNaN(amountVal) || amountVal <= 0 ? 1 : amountVal,
       payer: {
@@ -122,7 +182,7 @@ export default function CheckoutPage() {
         entityType: 'individual' as const,
       },
     };
-  }, [checkoutTotal, email]);
+  }, [amountToCharge, email]);
 
   const customization = React.useMemo(() => ({
     paymentMethods: {
@@ -136,10 +196,18 @@ export default function CheckoutPage() {
     },
   }), []);
 
+  // Submit handler wrapper to ensure stable reference and prevent double renders
+  const onSubmitRef = React.useRef(handlePaymentBrickSubmit);
+  onSubmitRef.current = handlePaymentBrickSubmit;
+
+  const stableOnSubmit = React.useCallback(async (param: any) => {
+    return onSubmitRef.current(param);
+  }, []);
+
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !address || !city || !zip) {
-      alert('Please fill out your identity and destination details on the guestlist.');
+      alert('Por favor, completa tus datos de identidad y destino en la lista de invitados.');
       return;
     }
     setLoading(true);
@@ -156,13 +224,13 @@ export default function CheckoutPage() {
         <div className="w-16 h-16 rounded-full bg-brand-charcoal flex items-center justify-center border border-white/5">
           <ShoppingBag className="w-6 h-6 text-neutral-500" />
         </div>
-        <h1 className="font-serif text-3xl text-neutral-400">NO RESERVED GEAR</h1>
+        <h1 className="font-serif text-3xl text-neutral-400">NO HAY PIEZAS RESERVADAS</h1>
         <p className="text-sm text-neutral-500 font-sans text-center max-w-sm">
-          Please add items to your selection prior to booking checkout slots.
+          Por favor, añade productos a tu selección antes de iniciar el pago.
         </p>
         <Link href="/">
           <Button variant="primary" size="md">
-            VIEW DESIGNS
+            VER DISEÑOS
           </Button>
         </Link>
       </div>
@@ -182,10 +250,10 @@ export default function CheckoutPage() {
                   <Clock className="w-10 h-10 text-brand-gold" />
                 </div>
                 <h2 className="font-serif text-3xl text-white uppercase tracking-wide">
-                  LOOK <span className="text-brand-gold italic">PENDING</span>
+                  PAGO <span className="text-brand-gold italic">PENDIENTE</span>
                 </h2>
                 <p className="text-sm text-neutral-300 font-sans leading-relaxed font-light">
-                  Your payment is in process. We will reserve your performancewear as soon as the transaction is finalized. Check your email on the guestlist for updates.
+                  Tu pago está en proceso. Reservaremos tus prendas en cuanto se complete la transacción. Revisa tu correo electrónico para ver las actualizaciones.
                 </p>
               </>
             ) : (
@@ -194,23 +262,44 @@ export default function CheckoutPage() {
                   <Check className="w-10 h-10 text-brand-magenta" />
                 </div>
                 <h2 className="font-serif text-3xl text-white uppercase tracking-wide">
-                  LOOK <span className="text-brand-magenta italic text-glow-magenta">SECURED</span>
+                  PAGO <span className="text-brand-magenta italic text-glow-magenta">APROBADO</span>
                 </h2>
                 <p className="text-sm text-neutral-300 font-sans leading-relaxed font-light">
-                  Your performancewear has been reserved. If customized, our CDMX  workshop is initiating craft parameters. We have sent receipt details to the guestlist email.
+                  Tus prendas han sido reservadas. Si son personalizadas, nuestro taller de la CDMX ya está iniciando la confección. Hemos enviado los detalles del recibo a tu correo electrónico.
                 </p>
               </>
             )}
             <div className="border-t border-white/5 pt-4 text-xs text-brand-gold font-display font-black tracking-widest">
-              WELCOME TO THE MOVEMENT
+              BIENVENIDO AL MOVIMIENTO
             </div>
             <div className="pt-2">
               <Link href="/">
                 <Button variant="primary" size="md" className="w-full">
-                  CONTINUE RHYTHM
+                  SEGUIR COMPRANDO
                 </Button>
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROCESSING PAYMENT MODAL OVERLAY */}
+      {loading && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-xs w-full bg-brand-charcoal border border-white/5 p-6 rounded-2xl text-center space-y-4 shadow-magenta-glow">
+            <div className="relative w-12 h-12 mx-auto">
+              <div className="absolute inset-0 rounded-full border-4 border-brand-magenta/10 animate-pulse" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-magenta animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-2.5 h-2.5 rounded-full bg-brand-magenta animate-pulse shadow-magenta-glow" />
+              </div>
+            </div>
+            <h3 className="font-display font-black tracking-widest text-xs text-white uppercase">
+              PROCESANDO PAGO...
+            </h3>
+            <p className="text-[10px] text-neutral-400 font-sans leading-relaxed">
+              Estamos procesando tu pago seguro. Por favor, no cierres esta ventana ni refresques la página.
+            </p>
           </div>
         </div>
       )}
@@ -221,7 +310,7 @@ export default function CheckoutPage() {
           href="/cart"
           className="inline-flex items-center gap-1.5 text-xs font-display font-bold text-neutral-400 hover:text-brand-magenta transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> BACK TO YOUR ARSENAL
+          <ArrowLeft className="w-4 h-4" /> VOLVER A TU ARSENAL
         </Link>
         <Link href="/cart" className="p-2 text-neutral-400 hover:text-white transition-colors" aria-label="Close checkout">
           <X className="w-5 h-5" />
@@ -232,10 +321,10 @@ export default function CheckoutPage() {
         {/* Title */}
         <div className="space-y-1 mb-8">
           <h1 className="text-3xl font-serif text-white tracking-wide uppercase">
-            SECURE THE <span className="text-brand-magenta italic text-glow-magenta">MOVEMENT</span>
+            FINALIZAR <span className="text-brand-magenta italic text-glow-magenta">COMPRA</span>
           </h1>
           <p className="text-[10px] text-neutral-500 font-display tracking-widest">
-            CHECKOUT PORTAL — FINAL STEP
+            PORTAL DE PAGO — PASO FINAL
           </p>
         </div>
 
@@ -243,282 +332,372 @@ export default function CheckoutPage() {
           {/* Shipping Form & Payment Setup (Left 7 Cols) */}
           <div className="lg:col-span-7 space-y-8">
 
-            {/* shipping address section */}
-            <div className="space-y-4">
-              <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2">
-                SHIPPING ADDRESS
-              </h3>
-
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="checkout-name" className="text-[10px] tracking-widest text-neutral-400 font-bold">FULL IDENTITY</label>
-                  <input
-                    id="checkout-name"
-                    type="text"
-                    required
-                    placeholder="Name on the guestlist"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    disabled={isInfoConfirmed}
-                    className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
-                  />
+            {showLoginCard ? (
+              <div className="bg-brand-charcoal/80 border border-white/5 p-8 rounded-2xl space-y-6 relative overflow-hidden shadow-[0_0_50px_0_rgba(219,39,119,0.08)] backdrop-blur-xl">
+                {/* Gradient Accent border */}
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand-magenta to-brand-gold" />
+                <h3 className="text-xl font-serif text-white tracking-wide uppercase">
+                  Guarda tu compra en tu perfil
+                </h3>
+                <p className="text-xs text-neutral-400 font-sans font-light leading-relaxed">
+                  Inicia sesión para consultar tus pedidos, reutilizar tus datos y recibir seguimiento de tu compra.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={() => signIn('google', { callbackUrl: '/checkout' })}
+                    className="w-full flex items-center justify-center gap-2 font-display font-black tracking-widest text-[10px] uppercase shadow-magenta-glow py-3.5"
+                  >
+                    <svg className="w-4 h-4 fill-current text-black" viewBox="0 0 24 24">
+                      <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.472 0-6.29-2.818-6.29-6.29 0-3.472 2.818-6.29 6.29-6.29 1.564 0 2.98.57 4.07 1.51l3.193-3.19C19.122 1.62 15.918 0 12.24 0 5.48 0 0 5.48 0 12.24s5.48 12.24 12.24 12.24c6.76 0 12.24-5.48 12.24-12.24 0-.82-.073-1.618-.213-2.386H12.24z" />
+                    </svg>
+                    Google
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => signIn('facebook', { callbackUrl: '/checkout' })}
+                    className="w-full flex items-center justify-center gap-2 font-display font-black tracking-widest text-[10px] uppercase border-white/10 text-white hover:border-brand-magenta/40 hover:bg-brand-magenta/5 py-3.5"
+                  >
+                    <svg className="w-4 h-4 fill-current text-neutral-300" viewBox="0 0 24 24">
+                      <path d="M9 8H7v3h2v9h3v-9h2.72l.42-3H12V6c0-.53.47-1 1-1h1.72V1h-2.88a3.5 3.5 0 0 0-3.84 3.5V8z" />
+                    </svg>
+                    Facebook
+                  </Button>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="checkout-email" className="text-[10px] tracking-widest text-neutral-400 font-bold">EMAIL ADDRESS</label>
-                  <input
-                    id="checkout-email"
-                    type="email"
-                    required
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isInfoConfirmed}
-                    className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
-                  />
+                <div className="text-center pt-4 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setIsGuest(true)}
+                    className="text-xs text-neutral-400 hover:text-brand-magenta transition-colors underline underline-offset-4 tracking-wide font-sans"
+                  >
+                    Continuar como invitado
+                  </button>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="checkout-phone" className="text-[10px] tracking-widest text-neutral-400 font-bold">PHONE NUMBER</label>
-                  <input
-                    id="checkout-phone"
-                    type="tel"
-                    required
-                    placeholder="e.g. 5555555555"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={isInfoConfirmed}
-                    className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="checkout-address" className="text-[10px] tracking-widest text-neutral-400 font-bold">THE DESTINATION</label>
-                  <input
-                    id="checkout-address"
-                    type="text"
-                    required
-                    placeholder="Street, Number, Suite"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    disabled={isInfoConfirmed}
-                    className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="checkout-city" className="text-[10px] tracking-widest text-neutral-400 font-bold">CITY</label>
-                    <input
-                      id="checkout-city"
-                      type="text"
-                      required
-                      placeholder="Location"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      disabled={isInfoConfirmed}
-                      className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label htmlFor="checkout-zip" className="text-[10px] tracking-widest text-neutral-400 font-bold">POSTAL CODE</label>
-                    <input
-                      id="checkout-zip"
-                      type="text"
-                      required
-                      placeholder="Zip Code"
-                      value={zip}
-                      onChange={(e) => setZip(e.target.value)}
-                      disabled={isInfoConfirmed}
-                      className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>            {/* shipping method section */}
-            <div className="space-y-4">
-              <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2">
-                SHIPPING METHOD
-              </h3>
-
-              <div className="space-y-3">
-                {/* Option 1: Express */}
-                <label
-                  className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${shippingMethod === 'express'
-                    ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
-                    : 'border-white/10 bg-brand-charcoal hover:border-white/20'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="shipping"
-                      checked={shippingMethod === 'express'}
-                      onChange={() => setShippingMethod('express')}
-                      disabled={isInfoConfirmed}
-                      className="accent-brand-magenta w-4 h-4 cursor-pointer disabled:opacity-50"
-                    />
-                    <div className="text-left font-sans text-xs">
-                      <p className="font-bold text-white uppercase tracking-wider">EXPRESS DELIVERY</p>
-                      <p className="text-neutral-400 text-[10px] mt-0.5">Arrival: 1-2 Business Days</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold text-white">$250 MXN</span>
-                </label>
-
-                {/* Option 2: Crafted */}
-                <label
-                  className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${shippingMethod === 'crafted'
-                    ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
-                    : 'border-white/10 bg-brand-charcoal hover:border-white/20'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="shipping"
-                      checked={shippingMethod === 'crafted'}
-                      onChange={() => setShippingMethod('crafted')}
-                      disabled={isInfoConfirmed}
-                      className="accent-brand-magenta w-4 h-4 cursor-pointer disabled:opacity-50"
-                    />
-                    <div className="text-left font-sans text-xs">
-                      <p className="font-bold text-white uppercase tracking-wider">CRAFTED DELIVERY</p>
-                      <p className="text-neutral-400 text-[10px] mt-0.5">Arrival: 4-6 Business Days</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold text-brand-gold uppercase tracking-widest">FREE</span>
-                </label>
-              </div>
-            </div>
-            {/* confirmation section */}
-            {!isInfoConfirmed ? (
-              <div className="pt-4">
-                <Button
-                  variant="primary"
-                  fullWidth
-                  size="lg"
-                  type="button"
-                  onClick={() => {
-                    if (!name || !email || !phone || !address || !city || !zip) {
-                      alert('Please fill out all identity, email, phone, and destination fields.');
-                      return;
-                    }
-                    if (!/\S+@\S+\.\S+/.test(email)) {
-                      alert('Please enter a valid email address.');
-                      return;
-                    }
-                    setIsInfoConfirmed(true);
-                  }}
-                  className="shadow-magenta-glow text-xs uppercase"
-                >
-                  Confirm Info & Select Payment
-                </Button>
               </div>
             ) : (
-              <div className="flex justify-between items-center p-4 border border-brand-magenta/30 bg-brand-magenta/5 rounded-xl">
-                <div className="text-left font-sans text-xs">
-                  <p className="font-bold text-white uppercase tracking-wider">Info Confirmed</p>
-                  <p className="text-neutral-400 text-[10px] mt-0.5">{email} — {phone} — {city}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsInfoConfirmed(false)}
-                  className="text-xs font-bold text-brand-magenta hover:underline"
-                >
-                  Edit details
-                </button>
-              </div>
-            )}
+              <>
+                {/* shipping address section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2">
+                    DIRECCIÓN DE ENVÍO
+                  </h3>
 
-            {/* secure payment section */}
-            <div className="space-y-4">
-              <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2">
-                SECURE PAYMENT
-              </h3>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label htmlFor="checkout-name" className="text-[10px] tracking-widest text-neutral-400 font-bold">NOMBRE COMPLETO</label>
+                      <input
+                        id="checkout-name"
+                        type="text"
+                        required
+                        placeholder="Nombre en la lista de invitados"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        disabled={isInfoConfirmed}
+                        className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
+                      />
+                    </div>
 
-              {!isInfoConfirmed ? (
-                <div className="p-4 bg-brand-charcoal border border-dashed border-white/10 rounded-xl text-center text-xs text-neutral-400">
-                  Please confirm your identity and destination details above to initialize secure checkout.
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {/* Option 1: Mercado Pago */}
-                    <label
-                      className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${paymentMethod === 'mercadopago'
-                        ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
-                        : 'border-white/10 bg-brand-charcoal hover:border-white/20'
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
+                    <div className="space-y-1.5">
+                      <label htmlFor="checkout-email" className="text-[10px] tracking-widest text-neutral-400 font-bold">CORREO ELECTRÓNICO</label>
+                      <input
+                        id="checkout-email"
+                        type="email"
+                        required
+                        placeholder="tucorreo@ejemplo.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isInfoConfirmed}
+                        className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="checkout-phone" className="text-[10px] tracking-widest text-neutral-400 font-bold">NÚMERO DE TELÉFONO</label>
+                      <input
+                        id="checkout-phone"
+                        type="tel"
+                        required
+                        placeholder="ej. 5555555555"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        disabled={isInfoConfirmed}
+                        className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="checkout-address" className="text-[10px] tracking-widest text-neutral-400 font-bold">DIRECCIÓN DE DESTINO</label>
+                      <input
+                        id="checkout-address"
+                        type="text"
+                        required
+                        placeholder="Calle, Número, Colonia/Interior"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        disabled={isInfoConfirmed}
+                        className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label htmlFor="checkout-city" className="text-[10px] tracking-widest text-neutral-400 font-bold">CIUDAD</label>
                         <input
-                          type="radio"
-                          name="payment"
-                          checked={paymentMethod === 'mercadopago'}
-                          onChange={() => setPaymentMethod('mercadopago')}
-                          className="accent-brand-magenta w-4 h-4 cursor-pointer"
+                          id="checkout-city"
+                          type="text"
+                          required
+                          placeholder="Ciudad/Estado"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          disabled={isInfoConfirmed}
+                          className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
                         />
-                        <div className="text-left font-sans text-xs">
-                          <p className="font-bold text-white uppercase tracking-wider">MERCADO PAGO</p>
-                          <p className="text-neutral-400 text-[10px] mt-0.5">Credit, Debit, and Local Options</p>
-                        </div>
                       </div>
-                      <div className="flex gap-1 bg-white/5 px-2 py-1 rounded">
-                        <span className="text-[8px] font-black text-neutral-400 tracking-wider">VISA</span>
-                        <span className="text-[8px] font-black text-neutral-400 tracking-wider">MC</span>
-                      </div>
-                    </label>
 
-                    {/* Option 2: Credit Card */}
-                    <label
-                      className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${paymentMethod === 'card'
-                        ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
-                        : 'border-white/10 bg-brand-charcoal hover:border-white/20'
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
+                      <div className="space-y-1.5">
+                        <label htmlFor="checkout-zip" className="text-[10px] tracking-widest text-neutral-400 font-bold">CÓDIGO POSTAL</label>
                         <input
-                          type="radio"
-                          name="payment"
-                          checked={paymentMethod === 'card'}
-                          onChange={() => setPaymentMethod('card')}
-                          className="accent-brand-magenta w-4 h-4 cursor-pointer"
-                        />
-                        <div className="text-left font-sans text-xs">
-                          <p className="font-bold text-white uppercase tracking-wider">CREDIT CARD</p>
-                          <p className="text-neutral-400 text-[10px] mt-0.5">Add credit or debit card directly</p>
-                        </div>
-                      </div>
-                      <span className="text-xs font-bold text-neutral-500 font-display tracking-widest">+ ADD CARD</span>
-                    </label>
-                  </div>
-
-                  {paymentMethod === 'mercadopago' && (
-                    <div className="pt-4 border-t border-white/5">
-                      <div className="p-4 bg-brand-charcoal border border-white/5 rounded-xl space-y-4">
-                        <h4 className="text-[10px] tracking-widest text-neutral-400 font-bold uppercase">PAYMENT PARAMETERS</h4>
-                        <Payment
-                          initialization={initialization}
-                          customization={customization}
-                          onSubmit={handlePaymentBrickSubmit}
-                          onError={(error) => console.error('MercadoPago Brick Error:', error)}
+                          id="checkout-zip"
+                          type="text"
+                          required
+                          placeholder="Código Postal"
+                          value={zip}
+                          onChange={(e) => setZip(e.target.value)}
+                          disabled={isInfoConfirmed}
+                          className="w-full bg-brand-charcoal border border-white/10 rounded-lg py-3 px-4 text-xs text-white focus:outline-none focus:border-brand-magenta transition-colors tracking-wide font-sans disabled:opacity-50"
                         />
                       </div>
                     </div>
-                  )}
-                </>
-              )}
-            </div>
+                  </div>
+                </div>
 
+                {/* shipping method section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2">
+                    MÉTODO DE ENVÍO
+                  </h3>
+
+                  <div className="space-y-3">
+                    {/* Standard Shipping option */}
+                    <div className="flex justify-between items-center p-4 border rounded-xl border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="shipping"
+                          checked={true}
+                          readOnly
+                          className="accent-brand-magenta w-4 h-4 cursor-pointer"
+                        />
+                        <div className="text-left font-sans text-xs">
+                          <p className="font-bold text-white uppercase tracking-wider">ENVÍO ESTÁNDAR</p>
+                          <p className="text-neutral-400 text-[10px] mt-0.5">
+                            {shippingCalc?.isMixedFulfillmentCart && !shippingCalc?.splitShippingSelected
+                              ? 'Enviaremos tu pedido completo cuando todas las piezas estén listas.'
+                              : shippingCalc?.hasMadeToOrderItems && !shippingCalc?.isMixedFulfillmentCart
+                                ? 'Incluye fabricación: llegada en 9-14 días hábiles.'
+                                : 'Llegada: 2-5 días hábiles.'
+                            }
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-white">
+                        {shippingCalc ? (
+                          shippingCalc.isFreeShipping ? (
+                            <span className="text-brand-gold uppercase tracking-widest font-display">GRATIS</span>
+                          ) : (
+                            `$${shippingCalc.shippingCost} MXN`
+                          )
+                        ) : (
+                          'Calculando...'
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Split Shipping Option (Mixed Cart Only) */}
+                    {shippingCalc?.splitShippingAvailable && (
+                      <label
+                        className={`flex flex-col p-4 border rounded-xl cursor-pointer transition-all duration-300 ${
+                          splitShippingSelected
+                            ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
+                            : 'border-white/10 bg-brand-charcoal hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center w-full">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={splitShippingSelected}
+                              onChange={(e) => setSplitShippingSelected(e.target.checked)}
+                              disabled={isInfoConfirmed}
+                              className="accent-brand-magenta w-4 h-4 cursor-pointer disabled:opacity-50"
+                            />
+                            <div className="text-left font-sans text-xs">
+                              <p className="font-bold text-white uppercase tracking-wider">
+                                Recibir primero las piezas disponibles
+                              </p>
+                              <p className="text-neutral-400 text-[10px] mt-0.5">
+                                Podemos enviar primero las piezas en stock y después las piezas bajo demanda.
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-white shrink-0">+$150 MXN</span>
+                        </div>
+
+                        {splitShippingSelected && (
+                          <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5 text-[10px] text-neutral-300 font-sans pl-7">
+                            <p className="flex justify-between">
+                              <span>• Primer envío: piezas disponibles</span>
+                              <span className="font-semibold text-white">2 a 5 días hábiles</span>
+                            </p>
+                            <p className="flex justify-between">
+                              <span>• Segundo envío: piezas bajo demanda</span>
+                              <span className="font-semibold text-white">9 a 14 días hábiles</span>
+                            </p>
+                          </div>
+                        )}
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Mixed Cart consolidado notice */}
+                  {shippingCalc?.isMixedFulfillmentCart && !splitShippingSelected && (
+                    <div className="bg-brand-magenta/5 border border-brand-magenta/20 p-4 rounded-xl text-xs text-neutral-300 font-sans flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-brand-magenta shrink-0 mt-0.5" />
+                      <span>Tu pedido combina piezas disponibles y piezas bajo demanda. Enviaremos tu pedido completo cuando todas las piezas estén listas.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* confirmation section */}
+                {!isInfoConfirmed ? (
+                  <div className="pt-4">
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      size="lg"
+                      type="button"
+                      onClick={() => {
+                        if (!name || !email || !phone || !address || !city || !zip) {
+                          alert('Por favor completa todos los campos de identidad, correo, teléfono y dirección.');
+                          return;
+                        }
+                        if (!/\S+@\S+\.\S+/.test(email)) {
+                          alert('Por favor introduce un correo electrónico válido.');
+                          return;
+                        }
+                        setIsInfoConfirmed(true);
+                      }}
+                      className="shadow-magenta-glow text-xs uppercase"
+                    >
+                      Confirmar Datos y Elegir Pago
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center p-4 border border-brand-magenta/30 bg-brand-magenta/5 rounded-xl">
+                    <div className="text-left font-sans text-xs">
+                      <p className="font-bold text-white uppercase tracking-wider">Datos Confirmados</p>
+                      <p className="text-neutral-400 text-[10px] mt-0.5">{email} — {phone} — {city}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsInfoConfirmed(false)}
+                      className="text-xs font-bold text-brand-magenta hover:underline"
+                    >
+                      Editar detalles
+                    </button>
+                  </div>
+                )}
+
+                {/* secure payment section */}
+                <div className="space-y-4">
+                  <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2">
+                    PAGO SEGURO
+                  </h3>
+
+                  {!isInfoConfirmed ? (
+                    <div className="p-4 bg-brand-charcoal border border-dashed border-white/10 rounded-xl text-center text-xs text-neutral-400">
+                      Por favor confirma tus datos de identidad y destino arriba para iniciar el pago seguro.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3">
+                        {/* Option 1: Mercado Pago */}
+                        <label
+                          className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${paymentMethod === 'mercadopago'
+                            ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
+                            : 'border-white/10 bg-brand-charcoal hover:border-white/20'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="payment"
+                              checked={paymentMethod === 'mercadopago'}
+                              onChange={() => setPaymentMethod('mercadopago')}
+                              className="accent-brand-magenta w-4 h-4 cursor-pointer"
+                            />
+                            <div className="text-left font-sans text-xs">
+                              <p className="font-bold text-white uppercase tracking-wider">MERCADO PAGO</p>
+                              <p className="text-neutral-400 text-[10px] mt-0.5">Tarjeta de Crédito, Débito y Opciones Locales</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-1 bg-white/5 px-2 py-1 rounded">
+                            <span className="text-[8px] font-black text-neutral-400 tracking-wider">VISA</span>
+                            <span className="text-[8px] font-black text-neutral-400 tracking-wider">MC</span>
+                          </div>
+                        </label>
+
+                        {/* Option 2: Credit Card */}
+                        <label
+                          className={`flex justify-between items-center p-4 border rounded-xl cursor-pointer transition-all duration-300 ${paymentMethod === 'card'
+                            ? 'border-brand-magenta bg-brand-magenta/5 shadow-magenta-glow'
+                            : 'border-white/10 bg-brand-charcoal hover:border-white/20'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="payment"
+                              checked={paymentMethod === 'card'}
+                              onChange={() => setPaymentMethod('card')}
+                              className="accent-brand-magenta w-4 h-4 cursor-pointer"
+                            />
+                            <div className="text-left font-sans text-xs">
+                              <p className="font-bold text-white uppercase tracking-wider">TARJETA DE CRÉDITO/DÉBITO</p>
+                              <p className="text-neutral-400 text-[10px] mt-0.5">Añade tarjeta de crédito o débito directamente</p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-neutral-500 font-display tracking-widest">+ AÑADIR TARJETA</span>
+                        </label>
+                      </div>
+
+                      {paymentMethod === 'mercadopago' && (
+                        <div className="pt-4 border-t border-white/5">
+                          <div className="p-4 bg-brand-charcoal border border-white/5 rounded-xl space-y-4">
+                            <h4 className="text-[10px] tracking-widest text-neutral-400 font-bold uppercase">PARÁMETROS DE PAGO</h4>
+                            <Payment
+                              initialization={initialization}
+                              customization={customization}
+                              onSubmit={stableOnSubmit}
+                              onError={(error) => console.error('MercadoPago Brick Error:', error)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Checkout Review Sidebar (Right 5 Cols) */}
           <div className="lg:col-span-5 space-y-6 bg-brand-charcoal border border-white/5 p-6 rounded-2xl">
 
             <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2">
-              YOUR ARSENAL ({cart.length} ITEMS)
+              TU ARSENAL ({cart.length} ARTÍCULOS)
             </h3>
 
             {/* List of checkout items */}
@@ -531,10 +710,10 @@ export default function CheckoutPage() {
                   <div className="flex-1 flex flex-col justify-between text-xs py-0.5">
                     <div>
                       <h4 className="font-display font-bold text-white line-clamp-1">{item.product.name}</h4>
-                      <p className="text-[10px] text-neutral-400 mt-0.5">SIZE: {item.selectedSize.toUpperCase()}</p>
+                      <p className="text-[10px] text-neutral-400 mt-0.5">TALLA: {item.selectedSize.toUpperCase()}</p>
                     </div>
                     <div className="flex justify-between items-center mt-2">
-                      <span className="text-[10px] text-neutral-500 font-bold">QTY: {item.quantity}</span>
+                      <span className="text-[10px] text-neutral-500 font-bold">CANT: {item.quantity}</span>
                       <Price amount={item.product.price * item.quantity} className="font-bold text-white" />
                     </div>
                   </div>
@@ -544,8 +723,8 @@ export default function CheckoutPage() {
 
             {/* WhatsApp assist links */}
             <WhatsAppAssist
-              text="Need immediate stylist confirmation?"
-              linkText="Direct Chat"
+              text="¿Necesitas confirmación inmediata de un estilista?"
+              linkText="Chat Directo"
             />
 
             {/* Order totals */}
@@ -555,16 +734,37 @@ export default function CheckoutPage() {
                 <Price amount={cartTotal} />
               </div>
               <div className="flex justify-between text-neutral-400">
-                <span>SHIPPING</span>
-                {shippingCost > 0 ? (
-                  <Price amount={shippingCost} />
+                <span>ENVÍO ESTÁNDAR</span>
+                {shippingCalc ? (
+                  shippingCalc.isFreeShipping ? (
+                    <span className="text-brand-gold font-bold uppercase tracking-wider text-[10px]">Gratis</span>
+                  ) : (
+                    <Price amount={shippingCalc.shippingCost} />
+                  )
                 ) : (
-                  <span className="text-brand-gold font-bold">FREE</span>
+                  <span>Calculando...</span>
                 )}
               </div>
+              {shippingCalc?.splitShippingSelected && (
+                <div className="flex justify-between text-neutral-400 animate-fade-in">
+                  <span>ENVÍO DIVIDIDO</span>
+                  <Price amount={shippingCalc.splitShippingCost} />
+                </div>
+              )}
+              {shippingCalc && !shippingCalc.isFreeShipping && (
+                <div className="text-[10px] text-brand-gold flex items-center justify-between font-sans">
+                  <span>Faltan para envío gratis:</span>
+                  <span><Price amount={shippingCalc.amountRemainingForFreeShipping} className="font-bold" /></span>
+                </div>
+              )}
+              {shippingCalc?.isFreeShipping && (
+                <div className="text-[10px] text-green-400 font-sans">
+                  Tu pedido califica para envío gratis.
+                </div>
+              )}
               <div className="flex justify-between text-white font-bold border-t border-white/5 pt-3">
-                <span className="font-display tracking-widest text-neutral-400">TOTAL ENERGY</span>
-                <Price amount={checkoutTotal} className="text-lg text-glow-magenta text-brand-magenta font-black" />
+                <span className="font-display tracking-widest text-neutral-400">TOTAL</span>
+                <Price amount={amountToCharge} className="text-lg text-glow-magenta text-brand-magenta font-black animate-pulse-slow" />
               </div>
             </div>
 
@@ -579,17 +779,17 @@ export default function CheckoutPage() {
                   disabled={loading}
                   className="shadow-magenta-glow text-xs"
                 >
-                  {loading ? 'SECURING...' : 'COMPLETE THE ENERGY'}
+                  {loading ? 'PROCESANDO...' : 'COMPLETAR COMPRA'}
                 </Button>
               ) : (
                 <div className="text-[10px] text-center text-neutral-500 font-display tracking-widest border border-white/5 bg-brand-dark/30 rounded-lg p-3">
-                  COMPLETE SECURE TRANSACTION VIA MERCADO PAGO FORM
+                  COMPLETA LA TRANSACCIÓN SEGURA CON EL FORMULARIO DE MERCADO PAGO
                 </div>
               )}
 
               <div className="flex justify-center items-center gap-1.5 text-[9px] text-neutral-500 font-display tracking-widest">
                 <Lock className="w-3.5 h-3.5 text-brand-magenta" />
-                <span>ENCRYPTED SECURE TRANSACTION</span>
+                <span>TRANSACCIÓN SEGURA ENCRIPTADA</span>
               </div>
             </div>
 

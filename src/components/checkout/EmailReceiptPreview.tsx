@@ -35,13 +35,13 @@ export default function EmailReceiptPreview({ order }: EmailReceiptPreviewProps)
   const getPaymentStatusText = (status: string) => {
     switch (status) {
       case 'paid':
-        return 'Aprobado (Paid)';
+        return 'Aprobado';
       case 'pending':
-        return 'Pendiente (Pending)';
+        return 'Pendiente';
       case 'failed':
-        return 'Fallido (Failed)';
+        return 'Fallido';
       case 'cancelled':
-        return 'Cancelado (Cancelled)';
+        return 'Cancelado';
       default:
         return status;
     }
