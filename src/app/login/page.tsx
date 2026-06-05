@@ -5,6 +5,7 @@ import { signIn, useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Zap, Loader2, AlertCircle } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import { trackLogin } from '@/lib/analytics';
 
 function LoginContent() {
   const { data: session, status } = useSession();
@@ -29,6 +30,7 @@ function LoginContent() {
     setLoadingGoogle(true);
     setError(null);
     try {
+      trackLogin('google');
       await signIn('google', { callbackUrl });
     } catch (e: any) {
       setError('Ocurrió un error al intentar iniciar sesión con Google.');
@@ -40,6 +42,7 @@ function LoginContent() {
     setLoadingFacebook(true);
     setError(null);
     try {
+      trackLogin('facebook');
       await signIn('facebook', { callbackUrl });
     } catch (e: any) {
       setError('Ocurrió un error al intentar iniciar sesión con Facebook.');

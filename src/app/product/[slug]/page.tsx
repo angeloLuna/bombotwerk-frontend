@@ -14,6 +14,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorState from '@/components/ui/ErrorState';
 import { ArrowLeft, Sparkles, Plus, Check, Info, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import Price2 from '@/components/ui/Price';
+import { trackViewItem } from '@/lib/analytics';
 
 interface ProductPageProps {
   params: any;
@@ -195,6 +196,12 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
   useEffect(() => {
     fetchProduct();
   }, [fetchProduct]);
+
+  useEffect(() => {
+    if (product) {
+      trackViewItem(product);
+    }
+  }, [product]);
 
   const handleAddToCart = () => {
     if (!product) return;

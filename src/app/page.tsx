@@ -11,6 +11,7 @@ import CollectionCard from '@/components/ui/CollectionCard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorState from '@/components/ui/ErrorState';
 import { Play, Sparkles, MapPin, ShieldCheck, Mail, ArrowRight, Flame, Percent, Zap } from 'lucide-react';
+import { trackWhatsAppClick } from '@/lib/analytics';
 
 export default function HomePage() {
   const [products, setProducts] = useState<ApiProduct[]>([]);
@@ -374,7 +375,12 @@ export default function HomePage() {
             </div>
 
             <div className="pt-4">
-              <a href="https://wa.me/5215555555555" target="_blank" rel="noopener noreferrer">
+              <a 
+                href="https://wa.me/5215555555555" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={() => trackWhatsAppClick('home_atelier_details')}
+              >
                 <Button variant="secondary" size="md" className="bg-transparent border border-white/20 text-white hover:bg-white/5">
                   VER DETALLES DEL TALLER
                 </Button>

@@ -4,6 +4,7 @@ import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import Navigation from '@/components/Navigation';
 import { SessionProvider } from 'next-auth/react';
+import { GoogleTagManager } from '@next/third-parties/google';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -56,9 +57,14 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
+
   return (
     <html lang="es" className={`${outfit.variable} ${bebas.variable} ${playfair.variable} ${orbitron.variable} ${syne.variable} h-full`}>
       <body className="h-full bg-brand-dark text-white flex flex-col selection:bg-brand-magenta selection:text-black">
+        {gtmId && process.env.NODE_ENV === 'production' && (
+          <GoogleTagManager gtmId={gtmId} />
+        )}
         <SessionProvider>
           <CartProvider>
             {/* Header & Nav */}

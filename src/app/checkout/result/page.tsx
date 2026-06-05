@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Price from '@/components/ui/Price';
 import Button from '@/components/ui/Button';
 import EmailReceiptPreview from '@/components/checkout/EmailReceiptPreview';
+import { trackPurchase } from '@/lib/analytics';
 import { 
   CheckCircle2, 
   AlertTriangle, 
@@ -59,6 +60,12 @@ function ResultPageContent() {
 
     fetchOrder();
   }, [orderId]);
+
+  useEffect(() => {
+    if (order && order.status === 'paid') {
+      trackPurchase(order);
+    }
+  }, [order]);
 
   if (loading) {
     return (

@@ -11,6 +11,7 @@ import { ArrowLeft, Check, Lock, ShieldCheck, ShoppingBag, X, Clock, AlertTriang
 import { initMercadoPago } from '@mercadopago/sdk-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import { trackBeginCheckout, trackLogin } from '@/lib/analytics';
 
 const Payment = dynamic(
   () => import('@mercadopago/sdk-react').then((mod) => mod.Payment),
@@ -35,6 +36,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<'mercadopago'>('mercadopago');
   const [bypassShipping, setBypassShipping] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
+  const [hasTrackedBegin, setHasTrackedBegin] = useState(false);
 
   useEffect(() => {
     if (session?.user) {
@@ -46,6 +48,13 @@ export default function CheckoutPage() {
       }
     }
   }, [session, name, email]);
+
+  useEffect(() => {
+    if (cart.length > 0 && !hasTrackedBegin) {
+      trackBeginCheckout(cart, cartTotal);
+      setHasTrackedBegin(true);
+    }
+  }, [cart, cartTotal, hasTrackedBegin]);
 
   const showLoginCard = status !== 'authenticated' && !isGuest;
 
@@ -354,7 +363,10 @@ export default function CheckoutPage() {
                   <Button
                     variant="primary"
                     type="button"
-                    onClick={() => signIn('google', { callbackUrl: '/checkout' })}
+                    onClick={() => {
+                      trackLogin('google');
+                      signIn('google', { callbackUrl: '/checkout' });
+                    }}
                     className="w-full flex items-center justify-center gap-2 font-display font-black tracking-widest text-[10px] uppercase shadow-magenta-glow py-3.5"
                   >
                     <svg className="w-4 h-4 fill-current text-black" viewBox="0 0 24 24">
@@ -366,7 +378,10 @@ export default function CheckoutPage() {
                     <Button
                       variant="secondary"
                       type="button"
-                      onClick={() => signIn('facebook', { callbackUrl: '/checkout' })}
+                      onClick={() => {
+                        trackLogin('facebook');
+                        signIn('facebook', { callbackUrl: '/checkout' });
+                      }}
                       className="w-full flex items-center justify-center gap-2 font-display font-black tracking-widest text-[10px] uppercase border-white/10 text-white hover:border-brand-magenta/40 hover:bg-brand-magenta/5 py-3.5"
                     >
                       <svg className="w-4 h-4 fill-current text-neutral-300" viewBox="0 0 24 24">

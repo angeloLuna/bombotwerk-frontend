@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ApiProduct as Product } from '@/types/api';
 import AddToCartConfirmation from '@/components/ui/AddToCartConfirmation';
+import { trackAddToCart } from '@/lib/analytics';
 
 export interface CartItem {
   product: Product;
@@ -75,6 +76,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setLastAddedItem({ product, quantity, selectedSize: size });
     setShowConfirmation(true);
+    trackAddToCart(product, size, quantity);
   };
 
   const removeFromCart = (productId: string, size: string) => {

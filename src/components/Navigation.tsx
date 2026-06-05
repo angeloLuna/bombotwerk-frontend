@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X, ShoppingBag, Search, User, Sparkles, MessageSquare, Compass } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { trackWhatsAppClick } from '@/lib/analytics';
 
 const Navigation: React.FC = () => {
   const pathname = usePathname();
@@ -162,6 +163,7 @@ const Navigation: React.FC = () => {
                 href="https://wa.me/5215555555555?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20ayuda%20con%20las%20tallas%20y%20selecci%C3%B3n%20de%20prendas%20en%20Bombo%20Twerk%21"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackWhatsAppClick('nav_mobile_drawer')}
                 className="flex items-center gap-3 text-sm text-neutral-400 hover:text-white transition-colors"
               >
                 <MessageSquare className="w-4 h-4 text-brand-magenta" />
@@ -238,6 +240,7 @@ const Navigation: React.FC = () => {
           href="https://wa.me/5215555555555?text=Hola!%20Me%20gustar%C3%ADa%20chatear%20con%20un%20estilista%20sobre%20tallas%20y%20opciones%20de%20dise%C3%B1o."
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackWhatsAppClick('nav_mobile_bar')}
           className="flex flex-col items-center gap-1 text-neutral-400 hover:text-white transition-colors"
         >
           <MessageSquare className="w-5 h-5 text-brand-magenta animate-pulse" />
