@@ -20,6 +20,51 @@ const Payment = dynamic(
 
 export default function CheckoutPage() {
   const { cart, cartTotal, clearCart } = useCart();
+  const getCartItemFulfillment = (item: any) => {
+    const variant = item.selectedVariant || item.product.variants?.find((v: any) =>
+      v.stocks?.some((s: any) => s.size === item.selectedSize)
+    ) || item.product.variants?.[0];
+    
+    if (!variant) {
+      return { status: 'error', error: 'No disponible', stockUnits: 0, mtoUnits: 0 };
+    }
+
+    const stockEntry = variant.stocks?.find((s: any) => s.size === item.selectedSize);
+    const stockQty = stockEntry ? stockEntry.quantity : 0;
+
+    if (variant.availabilityMode === 'discontinued') {
+      if (stockQty <= 0) {
+        return { status: 'error', error: 'Descontinuado y agotado', stockUnits: 0, mtoUnits: 0 };
+      }
+      if (item.quantity > stockQty) {
+        return { status: 'error', error: `Descontinuado. Solo quedan ${stockQty} en existencia`, stockUnits: 0, mtoUnits: 0 };
+      }
+      return { status: 'stock', stockUnits: item.quantity, mtoUnits: 0 };
+    }
+
+    if (variant.availabilityMode === 'stock_only') {
+      if (stockQty < item.quantity) {
+        return { status: 'error', error: `Stock insuficiente. Disponible: ${stockQty}`, stockUnits: 0, mtoUnits: 0 };
+      }
+      return { status: 'stock', stockUnits: item.quantity, mtoUnits: 0 };
+    }
+
+    if (variant.availabilityMode === 'made_to_order_only') {
+      return { status: 'made_to_order', stockUnits: 0, mtoUnits: item.quantity };
+    }
+
+    if (variant.availabilityMode === 'stock_and_made_to_order') {
+      if (stockQty >= item.quantity) {
+        return { status: 'stock', stockUnits: item.quantity, mtoUnits: 0 };
+      } else if (stockQty > 0) {
+        return { status: 'split', stockUnits: stockQty, mtoUnits: item.quantity - stockQty };
+      } else {
+        return { status: 'made_to_order', stockUnits: 0, mtoUnits: item.quantity };
+      }
+    }
+
+    return { status: 'error', error: 'Sin stock', stockUnits: 0, mtoUnits: 0 };
+  };
   const router = useRouter();
   const { data: session, status } = useSession();
 
@@ -94,7 +139,7 @@ export default function CheckoutPage() {
           body: JSON.stringify({
             cartItems: cart.map(item => ({
               productId: item.product.id,
-              variantId: getVariantIdForSize(item.product, item.selectedSize),
+              variantId: item.selectedVariant?.id || getVariantIdForSize(item.product, item.selectedSize),
               size: item.selectedSize,
               quantity: item.quantity
             })),
@@ -144,7 +189,7 @@ export default function CheckoutPage() {
           formData,
           cartItems: cart.map(item => ({
             productId: item.product.id,
-            variantId: getVariantIdForSize(item.product, item.selectedSize),
+            variantId: item.selectedVariant?.id || getVariantIdForSize(item.product, item.selectedSize),
             size: item.selectedSize,
             quantity: item.quantity
           })),
@@ -519,10 +564,10 @@ export default function CheckoutPage() {
                           <p className="font-bold text-white uppercase tracking-wider">ENVÍO ESTÁNDAR</p>
                           <p className="text-neutral-400 text-[10px] mt-0.5">
                             {shippingCalc?.isMixedFulfillmentCart && !shippingCalc?.splitShippingSelected
-                              ? 'Enviaremos tu pedido completo cuando todas las piezas estén listas.'
+                              ? `Enviaremos tu pedido completo cuando todas las piezas estén listas. Llegada estimada: ${shippingCalc?.estimatedDeliveryMinBusinessDays || 9}-${shippingCalc?.estimatedDeliveryMaxBusinessDays || 14} días hábiles.`
                               : shippingCalc?.hasMadeToOrderItems && !shippingCalc?.isMixedFulfillmentCart
-                                ? 'Incluye fabricación: llegada en 9-14 días hábiles.'
-                                : 'Llegada: 2-5 días hábiles.'
+                                ? `Incluye fabricación: llegada en ${shippingCalc?.estimatedDeliveryMinBusinessDays || 9}-${shippingCalc?.estimatedDeliveryMaxBusinessDays || 14} días hábiles.`
+                                : `Llegada: ${shippingCalc?.estimatedDeliveryMinBusinessDays || 2}-${shippingCalc?.estimatedDeliveryMaxBusinessDays || 5} días hábiles.`
                             }
                           </p>
                         </div>
@@ -604,12 +649,12 @@ export default function CheckoutPage() {
                         {splitShippingSelected && (
                           <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5 text-[10px] text-neutral-300 font-sans pl-7">
                             <p className="flex justify-between">
-                              <span>• Primer envío: piezas disponibles</span>
+                              <span>• Primer paquete: Envío inmediato</span>
                               <span className="font-semibold text-white">2 a 5 días hábiles</span>
                             </p>
                             <p className="flex justify-between">
-                              <span>• Segundo envío: piezas bajo demanda</span>
-                              <span className="font-semibold text-white">9 a 14 días hábiles</span>
+                              <span>• Segundo paquete: Bajo pedido</span>
+                              <span className="font-semibold text-white">fabricación 7–9 días hábiles + envío</span>
                             </p>
                           </div>
                         )}
@@ -725,23 +770,58 @@ export default function CheckoutPage() {
 
             {/* List of checkout items */}
             <div className="divide-y divide-white/5 space-y-4">
-              {cart.map((item, idx) => (
-                <div key={idx} className="flex gap-3 pt-4 first:pt-0">
-                  <div className="relative aspect-[3/4] w-14 overflow-hidden bg-brand-dark rounded border border-white/5 shrink-0">
-                    <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1 flex flex-col justify-between text-xs py-0.5">
-                    <div>
-                      <h4 className="font-display font-bold text-white line-clamp-1">{item.product.name}</h4>
-                      <p className="text-[10px] text-neutral-400 mt-0.5">TALLA: {item.selectedSize.toUpperCase()}</p>
+              {cart.map((item, idx) => {
+                const f = getCartItemFulfillment(item);
+                return (
+                  <div key={idx} className="flex gap-3 pt-4 first:pt-0">
+                    <div className="relative aspect-[3/4] w-14 overflow-hidden bg-brand-dark rounded border border-white/5 shrink-0">
+                      <img src={(item.selectedVariant && item.selectedVariant.images && item.selectedVariant.images[0]) ? item.selectedVariant.images[0].url : item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-[10px] text-neutral-500 font-bold">CANT: {item.quantity}</span>
-                      <Price amount={item.product.price * item.quantity} className="font-bold text-white" />
+                    <div className="flex-1 flex flex-col justify-between text-xs py-0.5">
+                      <div>
+                        <h4 className="font-display font-bold text-white line-clamp-1">{item.product.name}</h4>
+                        <div className="flex flex-wrap gap-1.5 items-center mt-0.5">
+                          <span className="text-[9px] text-neutral-400 font-bold uppercase">TALLA: {item.selectedSize.toUpperCase()}</span>
+                          {item.selectedVariant?.color && (
+                            <span className="text-[9px] text-neutral-400 font-bold uppercase">• COLOR: {item.selectedVariant.color.toUpperCase()}</span>
+                          )}
+                        </div>
+                        
+                        {/* Fulfillment details */}
+                        <div className="mt-1.5 text-[9px] font-semibold tracking-wide uppercase">
+                          {f.status === 'stock' && (
+                            <span className="text-green-400">✓ Envío inmediato</span>
+                          )}
+                          {f.status === 'made_to_order' && (() => {
+                            const variant = item.selectedVariant || item.product.variants?.[0];
+                            const minDays = variant?.madeToOrderMinDays ?? 7;
+                            const maxDays = variant?.madeToOrderMaxDays ?? 9;
+                            return <span className="text-brand-magenta">⚙ Bajo pedido ({minDays}–{maxDays} días hábiles)</span>;
+                          })()}
+                          {f.status === 'split' && (() => {
+                            const variant = item.selectedVariant || item.product.variants?.[0];
+                            const minDays = variant?.madeToOrderMinDays ?? 7;
+                            const maxDays = variant?.madeToOrderMaxDays ?? 9;
+                            return (
+                              <div className="space-y-0.5 normal-case tracking-normal text-left font-sans text-neutral-400">
+                                <p className="text-green-400 font-semibold uppercase tracking-wide">• {f.stockUnits} {f.stockUnits === 1 ? 'pieza disponible' : 'piezas disponibles'} para envío inmediato</p>
+                                <p className="text-brand-magenta font-semibold uppercase tracking-wide">• {f.mtoUnits} {f.mtoUnits === 1 ? 'pieza se fabrica' : 'piezas se fabrican'} bajo pedido ({minDays}–{maxDays} días hábiles)</p>
+                              </div>
+                            );
+                          })()}
+                          {f.status === 'error' && (
+                            <span className="text-red-500 font-bold">⚠️ {f.error}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-[10px] text-neutral-500 font-bold">CANT: {item.quantity}</span>
+                        <Price amount={item.product.price * item.quantity} className="font-bold text-white" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* WhatsApp assist links */}

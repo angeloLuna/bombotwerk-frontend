@@ -110,20 +110,21 @@ function getSizeStatus(variant: Variant | undefined, size: string): 'discontinue
   }
 }
 
-/** Get maximum allowed quantity for a size */
 function getProductMaxQty(variant: Variant | undefined, size: string): number {
   if (!size || !variant) return 99;
   
+  const stockEntry = variant.stocks?.find((s) => s.size === size);
+  const stockQty = stockEntry ? stockEntry.quantity : 0;
+
   if (variant.availabilityMode === 'discontinued') {
-    return 0;
+    return stockQty;
   }
   if (variant.availabilityMode === 'made_to_order_only' || variant.availabilityMode === 'stock_and_made_to_order') {
     return 99;
   }
   
   // stock_only
-  const stockEntry = variant.stocks?.find((s) => s.size === size);
-  return stockEntry ? stockEntry.quantity : 0;
+  return stockQty;
 }
 
 /** Derive global availability info for the product */
@@ -714,6 +715,21 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
                 +
               </button>
             </div>
+            {selectedSize && activeVariant && (() => {
+              const stockEntry = activeVariant.stocks?.find((s) => s.size === selectedSize);
+              const stockQty = stockEntry ? stockEntry.quantity : 0;
+              if (activeVariant.availabilityMode === 'stock_and_made_to_order' && quantity > stockQty) {
+                return (
+                  <div className="flex gap-2 items-center text-xs text-brand-magenta font-sans pt-1 mt-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-magenta animate-pulse shrink-0" />
+                    <p>
+                      Tenemos <span className="font-bold text-white">{stockQty}</span> disponibles para envío inmediato. Las <span className="font-bold text-white">{quantity - stockQty}</span> unidades extra se fabrican bajo pedido.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           {/* Sizing Info advice callout */}

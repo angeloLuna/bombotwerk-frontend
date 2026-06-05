@@ -17,27 +17,60 @@ export default function CartPage() {
     (p) => p.category === 'ACCESSORIES' || p.category === 'FOOTWEAR'
   ).slice(0, 2);
 
-  // Helper to determine if an item is made to order
-  const isItemMadeToOrder = (item: any) => {
+  const getCartItemFulfillment = (item: any) => {
     const variant = item.selectedVariant || item.product.variants?.find((v: any) =>
       v.stocks?.some((s: any) => s.size === item.selectedSize)
     ) || item.product.variants?.[0];
-    const stockEntry = variant?.stocks?.find((s: any) => s.size === item.selectedSize);
+    
+    if (!variant) {
+      return { status: 'error', error: 'No disponible', stockUnits: 0, mtoUnits: 0 };
+    }
+
+    const stockEntry = variant.stocks?.find((s: any) => s.size === item.selectedSize);
     const stockQty = stockEntry ? stockEntry.quantity : 0;
 
-    if (variant) {
-      if (variant.availabilityMode === 'made_to_order_only') {
-        return true;
+    if (variant.availabilityMode === 'discontinued') {
+      if (stockQty <= 0) {
+        return { status: 'error', error: 'Descontinuado y agotado', stockUnits: 0, mtoUnits: 0 };
       }
-      if (variant.availabilityMode === 'stock_and_made_to_order') {
-        return stockQty < item.quantity;
+      if (item.quantity > stockQty) {
+        return { status: 'error', error: `Descontinuado. Solo quedan ${stockQty} en existencia`, stockUnits: 0, mtoUnits: 0 };
+      }
+      return { status: 'stock', stockUnits: item.quantity, mtoUnits: 0 };
+    }
+
+    if (variant.availabilityMode === 'stock_only') {
+      if (stockQty < item.quantity) {
+        return { status: 'error', error: `Stock insuficiente. Disponible: ${stockQty}`, stockUnits: 0, mtoUnits: 0 };
+      }
+      return { status: 'stock', stockUnits: item.quantity, mtoUnits: 0 };
+    }
+
+    if (variant.availabilityMode === 'made_to_order_only') {
+      return { status: 'made_to_order', stockUnits: 0, mtoUnits: item.quantity };
+    }
+
+    if (variant.availabilityMode === 'stock_and_made_to_order') {
+      if (stockQty >= item.quantity) {
+        return { status: 'stock', stockUnits: item.quantity, mtoUnits: 0 };
+      } else if (stockQty > 0) {
+        return { status: 'split', stockUnits: stockQty, mtoUnits: item.quantity - stockQty };
+      } else {
+        return { status: 'made_to_order', stockUnits: 0, mtoUnits: item.quantity };
       }
     }
-    return false;
+
+    return { status: 'error', error: 'Sin stock', stockUnits: 0, mtoUnits: 0 };
   };
 
-  const hasInStock = cart.some(item => !isItemMadeToOrder(item));
-  const hasMadeToOrder = cart.some(item => isItemMadeToOrder(item));
+  const cartFulfillment = cart.map(item => ({
+    item,
+    fulfillment: getCartItemFulfillment(item)
+  }));
+
+  const hasErrors = cartFulfillment.some(f => f.fulfillment.status === 'error');
+  const hasInStock = cartFulfillment.some(f => f.fulfillment.stockUnits > 0);
+  const hasMadeToOrder = cartFulfillment.some(f => f.fulfillment.mtoUnits > 0);
   const isMixed = hasInStock && hasMadeToOrder;
 
   const isFreeShipping = cartTotal >= 1000;
@@ -108,37 +141,47 @@ export default function CartPage() {
                     </button>
                   </div>
                   {(() => {
-                    const variant = item.selectedVariant || item.product.variants?.find((v) =>
-                      v.stocks?.some((s) => s.size === item.selectedSize)
-                    ) || item.product.variants?.[0];
-                    const stockEntry = variant?.stocks?.find((s) => s.size === item.selectedSize);
-                    const stockQty = stockEntry ? stockEntry.quantity : 0;
-                    let text = item.product.availabilityText || 'Agotado';
-
-                    if (variant) {
-                      if (variant.availabilityMode === 'discontinued') {
-                        text = 'Descontinuado';
-                      } else if (variant.availabilityMode === 'made_to_order_only') {
-                        text = `Hecho bajo pedido · Listo en ${variant.madeToOrderMinDays ?? 7}–${variant.madeToOrderMaxDays ?? 9} días`;
-                      } else if (variant.availabilityMode === 'stock_and_made_to_order') {
-                        if (stockQty > 0) {
-                          text = 'Envío inmediato (Stock)';
-                        } else {
-                          text = `Bajo pedido · Listo en ${variant.madeToOrderMinDays ?? 7}–${variant.madeToOrderMaxDays ?? 9} días`;
-                        }
-                      } else if (variant.availabilityMode === 'stock_only') {
-                        if (stockQty > 0) {
-                          text = 'Envío inmediato (Stock)';
-                        } else {
-                          text = 'Agotado';
-                        }
-                      }
+                    const f = getCartItemFulfillment(item);
+                    if (f.status === 'error') {
+                      return (
+                        <span className="text-[10px] text-red-500 font-bold tracking-wider block uppercase">
+                          ⚠️ {f.error}
+                        </span>
+                      );
                     }
-                    return (
-                      <span className="text-[10px] text-brand-magenta font-semibold tracking-wider block uppercase">
-                        {text}
-                      </span>
-                    );
+                    if (f.status === 'stock') {
+                      return (
+                        <span className="text-[10px] text-green-400 font-semibold tracking-wider block uppercase">
+                          ✓ Envío inmediato (Stock)
+                        </span>
+                      );
+                    }
+                    if (f.status === 'made_to_order') {
+                      const variant = item.selectedVariant || item.product.variants?.[0];
+                      const minDays = variant?.madeToOrderMinDays ?? 7;
+                      const maxDays = variant?.madeToOrderMaxDays ?? 9;
+                      return (
+                        <span className="text-[10px] text-brand-magenta font-semibold tracking-wider block uppercase">
+                          ⚙ Bajo pedido · Fabricación {minDays}–{maxDays} días hábiles
+                        </span>
+                      );
+                    }
+                    if (f.status === 'split') {
+                      const variant = item.selectedVariant || item.product.variants?.[0];
+                      const minDays = variant?.madeToOrderMinDays ?? 7;
+                      const maxDays = variant?.madeToOrderMaxDays ?? 9;
+                      return (
+                        <div className="text-[10px] space-y-0.5">
+                          <span className="text-green-400 font-semibold tracking-wider block uppercase">
+                            ✓ {f.stockUnits} {f.stockUnits === 1 ? 'unidad' : 'unidades'} para envío inmediato
+                          </span>
+                          <span className="text-brand-magenta font-semibold tracking-wider block uppercase">
+                            ⚙ {f.mtoUnits} {f.mtoUnits === 1 ? 'unidad se fabrica' : 'unidades se fabrican'} bajo pedido ({minDays}–{maxDays} días)
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
                   })()}
                   
                   {/* Selected Size and Color Badges */}
@@ -303,9 +346,15 @@ export default function CartPage() {
           </div>
 
           <div className="pt-2">
-            <Link href="/checkout">
-              <Button variant="primary" fullWidth size="lg" className="shadow-magenta-glow">
-                PROCEDER AL PAGO <ArrowRight className="w-4 h-4 ml-2" />
+            <Link href={hasErrors ? "#" : "/checkout"} className={hasErrors ? "pointer-events-none" : ""}>
+              <Button 
+                variant="primary" 
+                fullWidth 
+                size="lg" 
+                className="shadow-magenta-glow"
+                disabled={hasErrors}
+              >
+                {hasErrors ? 'CORREGIR ERRORES EN EL CARRITO' : 'PROCEDER AL PAGO'} <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
           </div>
