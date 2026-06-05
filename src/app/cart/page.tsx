@@ -19,7 +19,7 @@ export default function CartPage() {
 
   // Helper to determine if an item is made to order
   const isItemMadeToOrder = (item: any) => {
-    const variant = item.product.variants?.find((v: any) =>
+    const variant = item.selectedVariant || item.product.variants?.find((v: any) =>
       v.stocks?.some((s: any) => s.size === item.selectedSize)
     ) || item.product.variants?.[0];
     const stockEntry = variant?.stocks?.find((s: any) => s.size === item.selectedSize);
@@ -82,12 +82,12 @@ export default function CartPage() {
         <div className="space-y-4">
           {cart.map((item) => (
             <div
-              key={`${item.product.id}-${item.selectedSize}`}
+              key={`${item.product.id}-${item.selectedSize}-${item.selectedVariant?.id || 'no-var'}`}
               className="flex gap-4 p-4 bg-brand-charcoal border border-white/5 rounded-2xl relative group"
             >
               {/* Product Thumbnail */}
               <Link href={`/product/${item.product.slug}`} className="relative aspect-[3/4] w-24 overflow-hidden bg-brand-dark shrink-0 border border-white/5 rounded-lg">
-                <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
+                <img src={(item.selectedVariant && item.selectedVariant.images && item.selectedVariant.images[0]) ? item.selectedVariant.images[0].url : item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
               </Link>
 
               {/* Product Info & Controls */}
@@ -100,7 +100,7 @@ export default function CartPage() {
                       </h3>
                     </Link>
                     <button
-                      onClick={() => removeFromCart(item.product.id, item.selectedSize)}
+                      onClick={() => removeFromCart(item.product.id, item.selectedSize, item.selectedVariant?.id)}
                       className="p-1 -mr-1 text-neutral-500 hover:text-red-500 transition-colors"
                       aria-label="Remove item"
                     >
@@ -108,7 +108,7 @@ export default function CartPage() {
                     </button>
                   </div>
                   {(() => {
-                    const variant = item.product.variants?.find((v) =>
+                    const variant = item.selectedVariant || item.product.variants?.find((v) =>
                       v.stocks?.some((s) => s.size === item.selectedSize)
                     ) || item.product.variants?.[0];
                     const stockEntry = variant?.stocks?.find((s) => s.size === item.selectedSize);
@@ -141,9 +141,22 @@ export default function CartPage() {
                     );
                   })()}
                   
-                  {/* Selected Size Badge */}
-                  <div className="inline-block border border-white/10 px-2 py-0.5 text-[10px] font-display font-bold tracking-widest text-neutral-400">
-                    TALLA: {item.selectedSize.toUpperCase()}
+                  {/* Selected Size and Color Badges */}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <div className="inline-block border border-white/10 px-2 py-0.5 text-[10px] font-display font-bold tracking-widest text-neutral-400">
+                      TALLA: {item.selectedSize.toUpperCase()}
+                    </div>
+                    {item.selectedVariant?.color && (
+                      <div className="inline-flex items-center gap-1.5 border border-white/10 px-2 py-0.5 text-[10px] font-display font-bold tracking-widest text-neutral-400">
+                        COLOR: {item.selectedVariant.color.toUpperCase()}
+                        {item.selectedVariant.colorHex && (
+                          <span
+                            className="w-2.5 h-2.5 rounded-full border border-white/20"
+                            style={{ backgroundColor: item.selectedVariant.colorHex }}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -152,7 +165,7 @@ export default function CartPage() {
                   {/* Quantity adjustment */}
                   <div className="flex items-center bg-brand-dark border border-white/10 rounded-lg p-1">
                     <button
-                      onClick={() => updateQuantity(item.product.id, item.selectedSize, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.product.id, item.selectedSize, item.quantity - 1, item.selectedVariant?.id)}
                       className="p-1 text-neutral-400 hover:text-white transition-colors"
                     >
                       <Minus className="w-3.5 h-3.5" />
@@ -161,7 +174,7 @@ export default function CartPage() {
                       {String(item.quantity).padStart(2, '0')}
                     </span>
                     <button
-                      onClick={() => updateQuantity(item.product.id, item.selectedSize, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.product.id, item.selectedSize, item.quantity + 1, item.selectedVariant?.id)}
                       className="p-1 text-neutral-400 hover:text-brand-magenta transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />

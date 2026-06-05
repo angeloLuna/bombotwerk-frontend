@@ -60,8 +60,8 @@ export default function RootLayout({
   const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
 
   return (
-    <html lang="es" className={`${outfit.variable} ${bebas.variable} ${playfair.variable} ${orbitron.variable} ${syne.variable} h-full`}>
-      <body className="h-full bg-brand-dark text-white flex flex-col selection:bg-brand-magenta selection:text-black">
+    <html lang="es" suppressHydrationWarning className={`${outfit.variable} ${bebas.variable} ${playfair.variable} ${orbitron.variable} ${syne.variable} h-full`}>
+      <body suppressHydrationWarning className="h-full bg-brand-dark text-white flex flex-col selection:bg-brand-magenta selection:text-black">
         {gtmId && process.env.NODE_ENV === 'production' && (
           <GoogleTagManager gtmId={gtmId} />
         )}

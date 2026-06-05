@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { getProductBySlug, getProducts } from '@/lib/api';
-import type { ApiProduct } from '@/types/api';
+import type { ApiProduct, Variant } from '@/types/api';
 import { useCart } from '@/context/CartContext';
 import Button from '@/components/ui/Button';
 import Price from '@/components/ui/Price';
@@ -21,15 +21,10 @@ interface ProductPageProps {
 }
 
 /** Derive availability info for a selected size */
-function getSelectedSizeAvailability(product: ApiProduct, size: string) {
-  if (!product.variants || product.variants.length === 0) {
+function getSelectedSizeAvailability(variant: Variant | undefined, size: string) {
+  if (!variant) {
     return { type: 'limited-drop' as const, text: 'Edición limitada — Contáctanos', disabled: true };
   }
-
-  // Find the variant containing this size
-  const variant = product.variants.find((v) =>
-    v.stocks?.some((s) => s.size === size)
-  ) || product.variants[0];
 
   const stockEntry = variant.stocks?.find((s) => s.size === size);
   const stockQty = stockEntry ? stockEntry.quantity : 0;
@@ -83,14 +78,10 @@ function getSelectedSizeAvailability(product: ApiProduct, size: string) {
 }
 
 /** Derive size status */
-function getSizeStatus(product: ApiProduct, size: string): 'discontinued' | 'made_to_order' | 'in_stock' | 'out_of_stock' {
-  if (!product.variants || product.variants.length === 0) {
+function getSizeStatus(variant: Variant | undefined, size: string): 'discontinued' | 'made_to_order' | 'in_stock' | 'out_of_stock' {
+  if (!variant) {
     return 'out_of_stock';
   }
-
-  const variant = product.variants.find((v) =>
-    v.stocks?.some((s) => s.size === size)
-  ) || product.variants[0];
 
   const stockEntry = variant.stocks?.find((s) => s.size === size);
   const stockQty = stockEntry ? stockEntry.quantity : 0;
@@ -120,13 +111,8 @@ function getSizeStatus(product: ApiProduct, size: string): 'discontinued' | 'mad
 }
 
 /** Get maximum allowed quantity for a size */
-function getProductMaxQty(product: ApiProduct, size: string): number {
-  if (!size || !product.variants) return 99;
-  const variant = product.variants.find((v) =>
-    v.stocks?.some((s) => s.size === size)
-  ) || product.variants[0];
-
-  if (!variant) return 99;
+function getProductMaxQty(variant: Variant | undefined, size: string): number {
+  if (!size || !variant) return 99;
   
   if (variant.availabilityMode === 'discontinued') {
     return 0;
@@ -206,12 +192,28 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
 
   // Interactive States
   const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedColor, setSelectedColor] = useState<string>('');
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [addedFeedback, setAddedFeedback] = useState<boolean>(false);
   const [errorFeedback, setErrorFeedback] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const carouselRef = React.useRef<HTMLDivElement>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+  // Pre-select first color variant when product loads
+  useEffect(() => {
+    if (product && product.variants && product.variants.length > 0) {
+      const firstVariantWithColor = product.variants.find((v) => !!v.color);
+      if (firstVariantWithColor && firstVariantWithColor.color) {
+        setSelectedColor(firstVariantWithColor.color);
+      }
+    }
+  }, [product]);
+
+  // Reset active image index when selected color changes
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [selectedColor]);
 
   const fetchProduct = useCallback(async () => {
     if (!slug) return;
@@ -267,13 +269,13 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
       setErrorFeedback('Por favor selecciona una talla primero.');
       return;
     }
-    const availability = getSelectedSizeAvailability(product, selectedSize);
+    const availability = getSelectedSizeAvailability(activeVariant, selectedSize);
     if (availability.disabled) {
       setErrorFeedback('Esta talla no está disponible para compra.');
       return;
     }
     setErrorFeedback('');
-    addToCart(product, selectedSize, quantity);
+    addToCart(product, selectedSize, quantity, activeVariant);
     setAddedFeedback(true);
     setTimeout(() => setAddedFeedback(false), 2000);
   };
@@ -329,7 +331,10 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
   if (!product) return null;
 
   const globalAvailability = getProductGlobalAvailability(product);
-  const images = product.images ?? [];
+  const activeVariant = product.variants?.find((v) => v.color === selectedColor) || product.variants?.[0];
+  const images = (activeVariant && activeVariant.images && activeVariant.images.length > 0)
+    ? activeVariant.images.map((img: any) => img.url)
+    : (product.images ?? []);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const container = e.currentTarget;
@@ -526,14 +531,71 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
             <div className="flex flex-col gap-2">
               {selectedSize ? (
                 <AvailabilityBadge
-                  type={getSelectedSizeAvailability(product, selectedSize).type}
-                  text={getSelectedSizeAvailability(product, selectedSize).text}
+                  type={getSelectedSizeAvailability(activeVariant, selectedSize).type}
+                  text={getSelectedSizeAvailability(activeVariant, selectedSize).text}
                 />
               ) : (
                 <AvailabilityBadge type={globalAvailability.type} text={globalAvailability.text} />
               )}
             </div>
           </div>
+
+          {/* Color Selector widget (swatches) */}
+          {product.variants && product.variants.some((v) => !!v.color) && (
+            <div className="space-y-4 pt-4 border-t border-white/5">
+              <div className="flex justify-between items-center text-xs tracking-wider">
+                <span className="font-display font-bold text-neutral-400">SELECCIONAR COLOR</span>
+                {selectedColor && (
+                  <span className="font-display font-black text-brand-magenta uppercase">
+                    {selectedColor}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                {Array.from(
+                  new Map(
+                    product.variants
+                      .filter((v) => !!v.color)
+                      .map((v) => [v.color!.toLowerCase(), v])
+                  ).values()
+                ).map((variant) => {
+                  const isColorActive = selectedColor === variant.color;
+                  return (
+                    <button
+                      key={variant.id}
+                      onClick={() => {
+                        setSelectedColor(variant.color || '');
+                        setErrorFeedback('');
+                        // Pre-select first size available for the new color variant
+                        const firstSize = variant.stocks?.find((s) => s.quantity > 0)?.size || variant.stocks?.[0]?.size || '';
+                        if (firstSize) setSelectedSize(firstSize);
+                      }}
+                      className={`relative w-8 h-8 rounded-full border-2 transition-all duration-300 ${
+                        isColorActive
+                          ? 'border-brand-magenta scale-110 shadow-magenta-glow'
+                          : 'border-white/10 hover:border-white/30'
+                      }`}
+                      style={{
+                        backgroundColor: variant.colorHex || '#ffffff',
+                      }}
+                      title={variant.color || ''}
+                    >
+                      {/* Visual indicator of selection if no hex color */}
+                      {!variant.colorHex && (
+                        <span className="absolute inset-0 flex items-center justify-center text-[8px] text-white uppercase font-bold px-0.5 truncate">
+                          {variant.color?.substring(0, 3)}
+                        </span>
+                      )}
+                      {isColorActive && (
+                        <span className="absolute -inset-1 rounded-full border border-brand-magenta animate-pulse" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Size Selector Widget */}
           {product.sizes && product.sizes.length > 0 && (
@@ -550,7 +612,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
               <div className="flex flex-wrap gap-3">
                 {product.sizes.map((size) => {
                   const isActive = selectedSize === size;
-                  const sizeStatus = getSizeStatus(product, size);
+                  const sizeStatus = getSizeStatus(activeVariant, size);
                   let statusClasses = '';
                   if (isActive) {
                     statusClasses = 'bg-brand-magenta border-brand-magenta text-black shadow-magenta-glow';
@@ -571,7 +633,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
                       onClick={() => {
                         setSelectedSize(size);
                         setErrorFeedback('');
-                        const maxQty = getProductMaxQty(product, size);
+                        const maxQty = getProductMaxQty(activeVariant, size);
                         setQuantity((prev) => Math.min(maxQty, prev));
                       }}
                       className={`min-w-[60px] h-[48px] border text-xs font-display font-black tracking-widest transition-all duration-300 ${statusClasses}`}
@@ -583,12 +645,9 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
               </div>
 
               {selectedSize && (() => {
-                const status = getSizeStatus(product, selectedSize);
-                const variant = product.variants?.find((v) =>
-                  v.stocks?.some((s) => s.size === selectedSize)
-                ) || product.variants?.[0];
-                const minDays = variant?.madeToOrderMinDays ?? 7;
-                const maxDays = variant?.madeToOrderMaxDays ?? 9;
+                const status = getSizeStatus(activeVariant, selectedSize);
+                const minDays = activeVariant?.madeToOrderMinDays ?? 7;
+                const maxDays = activeVariant?.madeToOrderMaxDays ?? 9;
 
                 if (status === 'made_to_order') {
                   return (
@@ -639,7 +698,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
                 min="1"
                 value={quantity}
                 onChange={(e) => {
-                  const maxQty = getProductMaxQty(product, selectedSize);
+                  const maxQty = getProductMaxQty(activeVariant, selectedSize);
                   setQuantity(Math.min(maxQty, Math.max(1, parseInt(e.target.value) || 1)));
                 }}
                 className="w-12 text-center bg-transparent border-0 font-mono font-bold text-sm text-white focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -647,7 +706,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
               <button
                 type="button"
                 onClick={() => {
-                  const maxQty = getProductMaxQty(product, selectedSize);
+                  const maxQty = getProductMaxQty(activeVariant, selectedSize);
                   setQuantity(prev => Math.min(maxQty, prev + 1));
                 }}
                 className="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white transition-colors text-lg font-bold"
@@ -681,13 +740,13 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
               size="lg"
               onClick={handleAddToCart}
               className="shadow-magenta-glow"
-              disabled={selectedSize ? getSelectedSizeAvailability(product, selectedSize).disabled : false}
+              disabled={selectedSize ? getSelectedSizeAvailability(activeVariant, selectedSize).disabled : false}
             >
               {addedFeedback ? (
                 <>
                   <Check className="w-5 h-5 mr-2" /> AÑADIDO AL ARSENAL
                 </>
-              ) : selectedSize && getSelectedSizeAvailability(product, selectedSize).disabled ? (
+              ) : selectedSize && getSelectedSizeAvailability(activeVariant, selectedSize).disabled ? (
                 'NO DISPONIBLE'
               ) : (
                 <>
@@ -750,12 +809,12 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
           label={
             addedFeedback
               ? 'AÑADIDO AL ARSENAL'
-              : selectedSize && getSelectedSizeAvailability(product, selectedSize).disabled
+              : selectedSize && getSelectedSizeAvailability(activeVariant, selectedSize).disabled
               ? 'NO DISPONIBLE'
               : 'AÑADIR AL ARSENAL'
           }
           onClick={handleAddToCart}
-          disabled={selectedSize ? getSelectedSizeAvailability(product, selectedSize).disabled : false}
+          disabled={selectedSize ? getSelectedSizeAvailability(activeVariant, selectedSize).disabled : false}
           price={product.price}
           icon={addedFeedback ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
         />

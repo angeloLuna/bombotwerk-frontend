@@ -119,6 +119,7 @@ export default function ProductFormComponent({
   const [form, setForm] = React.useState<ProductForm>(initialValues);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [openVariants, setOpenVariants] = React.useState<Record<number, boolean>>({ 0: true });
 
   const [gallery, setGallery] = React.useState<any[]>([]);
   const [deletedImageIds, setDeletedImageIds] = React.useState<string[]>([]);
@@ -337,6 +338,12 @@ export default function ProductFormComponent({
       const base = generateBaseSkuString(prev.name, prev.category, v.color);
       const unique = getUniqueSku(base, nextVariants.length - 1, nextVariants);
       nextVariants[nextVariants.length - 1] = { ...v, sku: unique };
+      
+      const newIdx = nextVariants.length - 1;
+      setTimeout(() => {
+        setOpenVariants((prevOpen) => ({ ...prevOpen, [newIdx]: true }));
+      }, 50);
+
       return { ...prev, variants: nextVariants };
     });
   }
@@ -434,6 +441,34 @@ export default function ProductFormComponent({
     }
   }
 
+  async function uploadVariantImages(pId: string, currentVariants: VariantForm[]): Promise<VariantForm[]> {
+    const updatedVariants = [...currentVariants];
+    for (let vIdx = 0; vIdx < updatedVariants.length; vIdx++) {
+      const variant = updatedVariants[vIdx];
+      if (variant.images && variant.images.length > 0) {
+        const updatedImages = await Promise.all(
+          variant.images.map(async (img) => {
+            if (img.file) {
+              const res = await adminApi.products.uploadRawImage(pId, img.file);
+              return {
+                url: res.url,
+                key: res.key,
+                alt: variant.color || 'Variant image',
+              };
+            }
+            return {
+              url: img.url,
+              key: img.key || null,
+              alt: img.alt || img.altText || null,
+            };
+          })
+        );
+        updatedVariants[vIdx] = { ...variant, images: updatedImages };
+      }
+    }
+    return updatedVariants;
+  }
+
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   async function handleSubmit(e: React.FormEvent) {
@@ -459,11 +494,24 @@ export default function ProductFormComponent({
     }
 
     try {
-      const dto = formToCreateDto(form);
       if (productId) {
+        // Edit mode: upload variant files first
+        const uploadedVariants = await uploadVariantImages(productId, form.variants);
+        const dto = formToCreateDto({ ...form, variants: uploadedVariants });
         await adminApi.products.update(productId, dto);
       } else {
-        await adminApi.products.create(dto);
+        // Create mode:
+        // 1. Create product first without variant images to avoid sending local blob URLs
+        const initialVariants = form.variants.map((v) => ({ ...v, images: [] }));
+        const initialDto = formToCreateDto({ ...form, variants: initialVariants });
+        const createdProduct = await adminApi.products.create(initialDto);
+
+        // 2. Upload variant files with newly created product ID
+        const uploadedVariants = await uploadVariantImages(createdProduct.id, form.variants);
+
+        // 3. Update the product variants with their uploaded images
+        const finalDto = formToCreateDto({ ...form, variants: uploadedVariants });
+        await adminApi.products.update(createdProduct.id, finalDto);
       }
       router.push('/admin/products');
       router.refresh();
@@ -1151,156 +1199,330 @@ export default function ProductFormComponent({
 
       {/* ── VARIANTS ── */}
       <SectionCard title={`Variants (${form.variants.length})`}>
-        <div className="space-y-6">
-          {form.variants.map((variant, vIdx) => (
-            <div key={vIdx} className="border border-white/5 rounded-lg p-4 space-y-4 bg-[#0f0f0f]">
-              {/* Variant header */}
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-display font-black tracking-widest text-neutral-400">
-                  VARIANT {vIdx + 1}
-                </span>
-                {form.variants.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeVariant(vIdx)}
-                    className="text-neutral-600 hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <Label>SKU *</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      required
-                      value={variant.sku}
-                      onChange={(e) => setVariant(vIdx, { sku: e.target.value })}
-                      placeholder="BT-LP-LEG-001"
-                      className="flex-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleGenerateSku(vIdx)}
-                      className="px-3 py-2 text-xs font-display font-bold text-brand-magenta border border-brand-magenta/20 rounded-lg hover:bg-brand-magenta/10 hover:border-brand-magenta/30 transition-all shrink-0 uppercase"
-                    >
-                      {variant.sku ? 'Regenerar' : 'Generar'}
-                    </button>
-                  </div>
-                  {/* Size-specific SKUs preview */}
-                  <div className="mt-2 text-[10px] text-neutral-500 font-mono border border-white/5 bg-brand-dark/25 p-2 rounded">
-                    <span className="font-bold text-neutral-400 block mb-1">Previsualización por Talla:</span>
-                    <div className="grid grid-cols-5 gap-1 text-center">
-                      {variant.stocks.map((s) => (
-                        <div key={s.size} className="bg-brand-charcoal/50 py-0.5 rounded border border-white/5">
-                          <span className="text-brand-magenta font-bold block">{s.size}</span>
-                          <span className="text-[8px] text-neutral-500">{variant.sku ? `${variant.sku}-${s.size}` : '—'}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <Label>Color / Style label</Label>
-                  <Input
-                    value={variant.color}
-                    onChange={(e) => setVariant(vIdx, { color: e.target.value })}
-                    placeholder="Midnight Black"
-                  />
-                </div>
-              </div>
-
-              {/* Variant Availability Mode & Production Days */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border border-white/5 bg-[#141414] p-3 rounded-lg">
-                <div>
-                  <Label>Availability Mode *</Label>
-                  <Select
-                    value={variant.availabilityMode}
-                    onChange={(e) => setVariant(vIdx, { availabilityMode: e.target.value })}
-                  >
-                    <option value="stock_only">Solo stock físico</option>
-                    <option value="stock_and_made_to_order">Stock físico + Bajo pedido</option>
-                    <option value="made_to_order_only">Solo bajo pedido (MTO)</option>
-                    <option value="discontinued">Descontinuado</option>
-                  </Select>
-                </div>
-                {(variant.availabilityMode === 'stock_and_made_to_order' || variant.availabilityMode === 'made_to_order_only') && (
-                  <>
-                    <div>
-                      <Label>Prod. Days Min</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={variant.madeToOrderMinDays}
-                        onChange={(e) =>
-                          setVariant(vIdx, {
-                            madeToOrderMinDays: parseInt(e.target.value) || 1,
-                          })
-                        }
-                        placeholder="7"
+        <div className="space-y-4">
+          {form.variants.map((variant, vIdx) => {
+            const isOpen = !!openVariants[vIdx];
+            return (
+              <div key={vIdx} className="border border-white/5 rounded-lg overflow-hidden bg-[#111111] transition-all">
+                {/* Variant Accordion Header */}
+                <div
+                  onClick={() => setOpenVariants((prev) => ({ ...prev, [vIdx]: !prev[vIdx] }))}
+                  className="flex items-center justify-between cursor-pointer p-4 bg-[#141414] hover:bg-[#1a1a1a] rounded-t-lg transition-colors border-b border-white/5 select-none"
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Thumbnail preview */}
+                    {variant.images && variant.images[0] ? (
+                      <img
+                        src={variant.images[0].url}
+                        className="w-10 h-10 object-cover rounded border border-white/10"
+                        alt="Variant thumbnail"
                       />
-                    </div>
-                    <div>
-                      <Label>Prod. Days Max</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={variant.madeToOrderMaxDays}
-                        onChange={(e) =>
-                          setVariant(vIdx, {
-                            madeToOrderMaxDays: parseInt(e.target.value) || 1,
-                          })
-                        }
-                        placeholder="9"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Size stocks */}
-              <div>
-                <Label>Size Stocks</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-1">
-                  {variant.stocks.map((stock, sIdx) => (
-                    <div
-                      key={sIdx}
-                      className="flex items-center justify-between gap-3 bg-[#1a1a1a] border border-white/5 rounded-lg px-3 py-2"
-                    >
-                      {/* Size label */}
-                      <div>
-                        <span className="text-[8px] font-display font-bold tracking-widest text-neutral-500 block">SIZE</span>
-                        <span className="text-xs font-mono font-black text-brand-magenta">{stock.size}</span>
+                    ) : (
+                      <div className="w-10 h-10 rounded border border-dashed border-white/10 flex items-center justify-center text-neutral-600 bg-black/20">
+                        <ImageIcon className="w-4 h-4" />
                       </div>
+                    )}
 
-                      {/* Quantity input */}
-                      <div className="w-20">
-                        <Label>Qty</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={stock.quantity}
-                          onChange={(e) =>
-                            setStock(vIdx, sIdx, { quantity: parseInt(e.target.value) || 0 })
-                          }
-                          className="py-1 px-2 text-center"
+                    {/* Variant details */}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white font-mono">
+                          {variant.sku || 'NUEVA_VARIANTE'}
+                        </span>
+                        {variant.colorHex && (
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-white/25 inline-block shadow-sm"
+                            style={{ backgroundColor: variant.colorHex }}
+                          />
+                        )}
+                        <span className="text-xs text-neutral-400">
+                          {variant.color || 'Sin Color'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-neutral-500 uppercase font-mono font-bold tracking-wider">
+                        {variant.availabilityMode === 'stock_only' && 'Solo Stock'}
+                        {variant.availabilityMode === 'stock_and_made_to_order' && 'Stock + Bajo Pedido'}
+                        {variant.availabilityMode === 'made_to_order_only' && 'Solo Bajo Pedido'}
+                        {variant.availabilityMode === 'discontinued' && 'Descontinuado'}
+                        {` · ${variant.stocks.reduce((acc, s) => acc + s.quantity, 0)} unidades en stock`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {form.variants.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeVariant(vIdx);
+                        }}
+                        className="text-neutral-500 hover:text-red-400 transition-colors p-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <ChevronDown
+                      className={`w-4 h-4 text-neutral-400 transition-transform duration-200 ${
+                        isOpen ? 'rotate-180' : 'rotate-0'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Variant Accordion Content */}
+                {isOpen && (
+                  <div className="p-4 space-y-4 bg-[#0f0f0f]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <Label>SKU *</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            required
+                            value={variant.sku}
+                            onChange={(e) => setVariant(vIdx, { sku: e.target.value })}
+                            placeholder="BT-LP-LEG-001"
+                            className="flex-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleGenerateSku(vIdx);
+                            }}
+                            className="px-3 py-2 text-xs font-display font-bold text-brand-magenta border border-brand-magenta/20 rounded-lg hover:bg-brand-magenta/10 hover:border-brand-magenta/30 transition-all shrink-0 uppercase"
+                          >
+                            {variant.sku ? 'Regenerar' : 'Generar'}
+                          </button>
+                        </div>
+                        {/* Size-specific SKUs preview */}
+                        <div className="mt-2 text-[10px] text-neutral-500 font-mono border border-white/5 bg-brand-dark/25 p-2 rounded">
+                          <span className="font-bold text-neutral-400 block mb-1">Previsualización por Talla:</span>
+                          <div className="grid grid-cols-5 gap-1 text-center">
+                            {variant.stocks.map((s) => (
+                              <div key={s.size} className="bg-brand-charcoal/50 py-0.5 rounded border border-white/5">
+                                <span className="text-brand-magenta font-bold block">{s.size}</span>
+                                <span className="text-[8px] text-neutral-500">{variant.sku ? `${variant.sku}-${s.size}` : '—'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <Label>Color / Style label</Label>
+                            <Input
+                              value={variant.color}
+                              onChange={(e) => setVariant(vIdx, { color: e.target.value })}
+                              placeholder="Midnight Black"
+                            />
+                          </div>
+                          <div>
+                            <Label>Color Hex (#FF0080)</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={variant.colorHex || ''}
+                                onChange={(e) => setVariant(vIdx, { colorHex: e.target.value })}
+                                placeholder="#FF0080"
+                                className="flex-1"
+                              />
+                              <input
+                                type="color"
+                                value={variant.colorHex && variant.colorHex.startsWith('#') && variant.colorHex.length === 7 ? variant.colorHex : '#ffffff'}
+                                onChange={(e) => setVariant(vIdx, { colorHex: e.target.value })}
+                                className="w-10 h-10 p-0 border border-white/10 rounded cursor-pointer bg-transparent"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Variant Availability Mode & Production Days */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border border-white/5 bg-[#141414] p-3 rounded-lg">
+                      <div>
+                        <Label>Availability Mode *</Label>
+                        <Select
+                          value={variant.availabilityMode}
+                          onChange={(e) => setVariant(vIdx, { availabilityMode: e.target.value })}
+                        >
+                          <option value="stock_only">Solo stock físico</option>
+                          <option value="stock_and_made_to_order">Stock físico + Bajo pedido</option>
+                          <option value="made_to_order_only">Solo bajo pedido (MTO)</option>
+                          <option value="discontinued">Descontinuado</option>
+                        </Select>
+                      </div>
+                      {(variant.availabilityMode === 'stock_and_made_to_order' || variant.availabilityMode === 'made_to_order_only') && (
+                        <>
+                          <div>
+                            <Label>Prod. Days Min</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={variant.madeToOrderMinDays}
+                              onChange={(e) =>
+                                setVariant(vIdx, {
+                                  madeToOrderMinDays: parseInt(e.target.value) || 1,
+                                })
+                              }
+                              placeholder="7"
+                            />
+                          </div>
+                          <div>
+                            <Label>Prod. Days Max</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={variant.madeToOrderMaxDays}
+                              onChange={(e) =>
+                                setVariant(vIdx, {
+                                  madeToOrderMaxDays: parseInt(e.target.value) || 1,
+                                })
+                              }
+                              placeholder="9"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Size stocks */}
+                    <div>
+                      <Label>Size Stocks</Label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mt-1">
+                        {variant.stocks.map((stock, sIdx) => (
+                          <div
+                            key={sIdx}
+                            className="flex items-center justify-between gap-2 bg-[#1a1a1a] border border-white/5 rounded-lg px-2 py-1.5"
+                          >
+                            {/* Size label */}
+                            <div>
+                              <span className="text-[7px] font-display font-bold tracking-widest text-neutral-500 block">SIZE</span>
+                              <span className="text-xs font-mono font-black text-brand-magenta">{stock.size}</span>
+                            </div>
+
+                            {/* Quantity input */}
+                            <div className="w-14">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={stock.quantity}
+                                onChange={(e) =>
+                                  setStock(vIdx, sIdx, { quantity: parseInt(e.target.value) || 0 })
+                                }
+                                className="py-1 px-1.5 text-center text-xs"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Variant Image Manager */}
+                    <div className="border-t border-white/5 pt-4 space-y-3">
+                      <Label>Imágenes de la Variante</Label>
+                      <div className="mt-2">
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (files.length === 0) return;
+
+                            const newItems = files.map((file) => ({
+                              file,
+                              url: URL.createObjectURL(file),
+                              key: null,
+                            }));
+                            setVariant(vIdx, {
+                              images: [...(variant.images || []), ...newItems]
+                            });
+                            e.target.value = '';
+                          }}
+                          className="w-full text-xs text-neutral-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-brand-magenta/10 file:text-brand-magenta hover:file:bg-brand-magenta/20 file:cursor-pointer"
                         />
                       </div>
-                    </div>
-                  ))}
-                </div>
+                      {variant.images && variant.images.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3">
+                          {variant.images.map((img: any, imgIdx: number) => (
+                            <div key={imgIdx} className="relative aspect-square rounded-lg bg-[#151515] border border-white/5 overflow-hidden group">
+                              <img src={img.url} className="w-full h-full object-cover" alt="Variant preview" />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                                <div className="flex justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newImages = [...variant.images];
+                                      newImages.splice(imgIdx, 1);
+                                      setVariant(vIdx, { images: newImages });
+                                    }}
+                                    className="p-1 bg-black/80 hover:bg-red-950 text-neutral-400 hover:text-red-400 rounded transition-colors"
+                                    title="Eliminar foto"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
 
+                                <div className="flex justify-between items-center">
+                                  <span className="bg-black/70 border border-white/10 text-[8px] font-mono px-1 rounded text-white">
+                                    #{imgIdx + 1}
+                                  </span>
+                                  <div className="flex gap-1">
+                                    {imgIdx > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newImages = [...variant.images];
+                                          const temp = newImages[imgIdx];
+                                          newImages[imgIdx] = newImages[imgIdx - 1];
+                                          newImages[imgIdx - 1] = temp;
+                                          setVariant(vIdx, { images: newImages });
+                                        }}
+                                        className="p-1 bg-black/80 hover:bg-brand-magenta text-white rounded transition-colors text-[9px] font-mono leading-none"
+                                        title="Mover atrás"
+                                      >
+                                        ←
+                                      </button>
+                                    )}
+                                    {imgIdx < variant.images.length - 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newImages = [...variant.images];
+                                          const temp = newImages[imgIdx];
+                                          newImages[imgIdx] = newImages[imgIdx + 1];
+                                          newImages[imgIdx + 1] = temp;
+                                          setVariant(vIdx, { images: newImages });
+                                        }}
+                                        className="p-1 bg-black/80 hover:bg-brand-magenta text-white rounded transition-colors text-[9px] font-mono leading-none"
+                                        title="Mover adelante"
+                                      >
+                                        →
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-neutral-600 italic">No hay imágenes asignadas a esta variante.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <button
           type="button"
           onClick={addVariant}
-          className="flex items-center gap-1.5 text-[10px] font-display font-bold tracking-widest text-brand-magenta hover:text-white transition-colors mt-2"
+          className="flex items-center gap-1.5 text-[10px] font-display font-bold tracking-widest text-brand-magenta hover:text-white transition-colors mt-4"
         >
           <Plus className="w-3.5 h-3.5" /> ADD VARIANT
         </button>

@@ -11,10 +11,12 @@ export interface AdminVariant {
   id?: string;
   sku: string;
   color?: string;
+  colorHex?: string;
   availabilityMode?: string;
   madeToOrderMinDays?: number;
   madeToOrderMaxDays?: number;
   stocks: AdminSizeStock[];
+  images?: any[];
 }
 
 export interface AdminCollection {
@@ -61,10 +63,12 @@ export interface SizeStockForm {
 export interface VariantForm {
   sku: string;
   color: string;
+  colorHex: string;
   availabilityMode: string;
   madeToOrderMinDays: number;
   madeToOrderMaxDays: number;
   stocks: SizeStockForm[];
+  images: any[];
 }
 
 export interface ProductForm {
@@ -95,10 +99,12 @@ export function defaultVariant(): VariantForm {
   return {
     sku: '',
     color: '',
+    colorHex: '',
     availabilityMode: 'stock_only',
     madeToOrderMinDays: 7,
     madeToOrderMaxDays: 9,
     stocks: defaultSizeStocks(),
+    images: [],
   };
 }
 
@@ -136,6 +142,7 @@ export function formToCreateDto(form: ProductForm) {
     variants: form.variants.map((v) => ({
       sku: v.sku,
       color: v.color || undefined,
+      colorHex: v.colorHex || undefined,
       availabilityMode: v.availabilityMode,
       madeToOrderMinDays: v.availabilityMode !== 'stock_only' && v.availabilityMode !== 'discontinued' ? Number(v.madeToOrderMinDays) : undefined,
       madeToOrderMaxDays: v.availabilityMode !== 'stock_only' && v.availabilityMode !== 'discontinued' ? Number(v.madeToOrderMaxDays) : undefined,
@@ -143,6 +150,11 @@ export function formToCreateDto(form: ProductForm) {
         size: s.size,
         quantity: s.quantity,
       })),
+      images: v.images && v.images.length > 0 ? v.images.map((img) => ({
+        url: img.url,
+        key: img.key || undefined,
+        alt: img.alt || undefined,
+      })) : undefined,
     })),
   };
 }
@@ -186,10 +198,12 @@ export function productToForm(p: AdminProduct): ProductForm {
             return {
               sku: v.sku,
               color: v.color ?? '',
+              colorHex: v.colorHex ?? '',
               availabilityMode: v.availabilityMode ?? 'stock_only',
               madeToOrderMinDays: v.madeToOrderMinDays ?? 7,
               madeToOrderMaxDays: v.madeToOrderMaxDays ?? 9,
               stocks: mergedStocks,
+              images: v.images || [],
             };
           })
         : [defaultVariant()],

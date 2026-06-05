@@ -74,7 +74,9 @@ export default function AddToCartConfirmation({
   };
 
   // Safe fallback image
-  const imageUrl = item.product.images?.[0] || 'https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=800';
+  const imageUrl = (item.selectedVariant && item.selectedVariant.images && item.selectedVariant.images[0])
+    ? item.selectedVariant.images[0].url
+    : (item.product.images?.[0] || 'https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=800');
 
   return (
     <div
@@ -137,6 +139,20 @@ export default function AddToCartConfirmation({
               <div className="text-[10px] font-mono text-neutral-400">
                 Talla: <strong className="text-white">{item.selectedSize}</strong>
               </div>
+              {item.selectedVariant?.color && (
+                <div className="text-[10px] font-mono text-neutral-400 flex items-center gap-1.5">
+                  Color:{' '}
+                  <strong className="text-white flex items-center gap-1">
+                    {item.selectedVariant.color}
+                    {item.selectedVariant.colorHex && (
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-white/20 inline-block animate-none"
+                        style={{ backgroundColor: item.selectedVariant.colorHex }}
+                      />
+                    )}
+                  </strong>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-neutral-400">Cant:</span>
                 <div className="flex items-center border border-white/10 rounded bg-[#1a1a1a] h-6 px-1">

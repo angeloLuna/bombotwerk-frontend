@@ -461,7 +461,7 @@ export default function HomePage() {
 
       {/* FOOTER */}
       <footer className="py-12 border-t border-white/5 text-center text-[10px] text-neutral-600 tracking-widest bg-brand-dark flex flex-col space-y-4">
-        <span>© {new Date().getFullYear()} BOMBO TWERK. TODOS LOS DERECHOS RESERVADOS.</span>
+        <span suppressHydrationWarning>© {new Date().getFullYear()} BOMBO TWERK. TODOS LOS DERECHOS RESERVADOS.</span>
         <div className="flex justify-center gap-6 text-neutral-400 flex-wrap">
           <a href="#" className="hover:text-brand-magenta transition-colors">GUÍA DE TALLAS</a>
           <a href="#" className="hover:text-brand-magenta transition-colors">ENVÍOS Y TIEMPOS DE ENTREGA</a>

@@ -19,10 +19,12 @@ export interface Variant {
   id: string;
   sku: string;
   color: string | null;
+  colorHex?: string | null;
   availabilityMode: string;
   madeToOrderMinDays?: number;
   madeToOrderMaxDays?: number;
   stocks: SizeStock[];
+  images?: any[] | null;
 }
 
 export interface CollectionRef {

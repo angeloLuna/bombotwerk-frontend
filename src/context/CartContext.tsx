@@ -9,13 +9,14 @@ export interface CartItem {
   product: Product;
   quantity: number;
   selectedSize: string;
+  selectedVariant?: Variant;
 }
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: Product, size: string, quantity?: number) => void;
-  removeFromCart: (productId: string, size: string) => void;
-  updateQuantity: (productId: string, size: string, quantity: number) => void;
+  addToCart: (product: Product, size: string, quantity?: number, selectedVariant?: Variant) => void;
+  removeFromCart: (productId: string, size: string, variantId?: string) => void;
+  updateQuantity: (productId: string, size: string, quantity: number, variantId?: string) => void;
   clearCart: () => void;
   cartTotal: number;
   cartCount: number;
@@ -53,8 +54,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cart, isLoaded]);
 
-  const getProductMaxQty = (product: Product, size: string): number => {
-    const variant = product.variants?.find((v) =>
+  const getProductMaxQty = (product: Product, size: string, activeVariant?: Variant): number => {
+    const variant = activeVariant || product.variants?.find((v) =>
       v.stocks?.some((s) => s.size === size)
     ) || product.variants?.[0];
 
@@ -75,13 +76,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [lastAddedItem, setLastAddedItem] = useState<CartItem | null>(null);
 
-  const addToCart = (product: Product, size: string, quantity = 1) => {
-    const maxQty = getProductMaxQty(product, size);
+  const addToCart = (product: Product, size: string, quantity = 1, selectedVariant?: Variant) => {
+    const maxQty = getProductMaxQty(product, size, selectedVariant);
     let finalQty = quantity;
 
     setCart((prevCart) => {
       const existingItemIndex = prevCart.findIndex(
-        (item) => item.product.id === product.id && item.selectedSize === size
+        (item) =>
+          item.product.id === product.id &&
+          item.selectedSize === size &&
+          item.selectedVariant?.id === selectedVariant?.id
       );
 
       if (existingItemIndex > -1) {
@@ -108,31 +112,42 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (quantity > maxQty) {
         alert(`Lo sentimos, solo quedan ${maxQty} unidades disponibles en existencia para esta talla.`);
         finalQty = maxQty;
-        return [...prevCart, { product, quantity: maxQty, selectedSize: size }];
+        return [...prevCart, { product, quantity: maxQty, selectedSize: size, selectedVariant }];
       }
-      return [...prevCart, { product, quantity, selectedSize: size }];
+      return [...prevCart, { product, quantity, selectedSize: size, selectedVariant }];
     });
 
-    setLastAddedItem({ product, quantity: finalQty, selectedSize: size });
+    setLastAddedItem({ product, quantity: finalQty, selectedSize: size, selectedVariant });
     setShowConfirmation(true);
     trackAddToCart(product, size, finalQty);
   };
 
-  const removeFromCart = (productId: string, size: string) => {
+  const removeFromCart = (productId: string, size: string, variantId?: string) => {
     setCart((prevCart) =>
-      prevCart.filter((item) => !(item.product.id === productId && item.selectedSize === size))
+      prevCart.filter(
+        (item) =>
+          !(
+            item.product.id === productId &&
+            item.selectedSize === size &&
+            (!variantId || item.selectedVariant?.id === variantId)
+          )
+      )
     );
   };
 
-  const updateQuantity = (productId: string, size: string, quantity: number) => {
+  const updateQuantity = (productId: string, size: string, quantity: number, variantId?: string) => {
     if (quantity <= 0) {
-      removeFromCart(productId, size);
+      removeFromCart(productId, size, variantId);
       return;
     }
     setCart((prevCart) =>
       prevCart.map((item) => {
-        if (item.product.id === productId && item.selectedSize === size) {
-          const maxQty = getProductMaxQty(item.product, size);
+        if (
+          item.product.id === productId &&
+          item.selectedSize === size &&
+          (!variantId || item.selectedVariant?.id === variantId)
+        ) {
+          const maxQty = getProductMaxQty(item.product, size, item.selectedVariant);
           if (quantity > maxQty) {
             alert(`Lo sentimos, solo quedan ${maxQty} unidades disponibles en existencia para esta talla.`);
             return { ...item, quantity: maxQty };
