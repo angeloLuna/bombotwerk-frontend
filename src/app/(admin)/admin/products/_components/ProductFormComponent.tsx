@@ -123,6 +123,7 @@ export default function ProductFormComponent({
   const [gallery, setGallery] = React.useState<any[]>([]);
   const [deletedImageIds, setDeletedImageIds] = React.useState<string[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
+  const [existingSkus, setExistingSkus] = React.useState<string[]>([]);
 
   const [uploadFiles, setUploadFiles] = React.useState<File[]>([]);
   const [uploadAlt, setUploadAlt] = React.useState('');
@@ -167,6 +168,45 @@ export default function ProductFormComponent({
     }
   }, [productId, fetchImages]);
 
+  React.useEffect(() => {
+    async function loadAllProducts() {
+      try {
+        const list = await adminApi.products.list();
+        const skus: string[] = [];
+        list.forEach((p) => {
+          if (p.id === productId) return;
+          p.variants?.forEach((v) => {
+            if (v.sku) skus.push(v.sku.toUpperCase());
+          });
+        });
+        setExistingSkus(skus);
+      } catch (err) {
+        console.error('Failed to load existing SKUs:', err);
+      }
+    }
+    loadAllProducts();
+  }, [productId]);
+
+  React.useEffect(() => {
+    // Automatically generate first variant SKU if empty on name/category/color changes
+    setForm((prev) => {
+      let modified = false;
+      const updatedVariants = prev.variants.map((v, idx) => {
+        if (!v.sku && (prev.name || prev.category || v.color)) {
+          const base = generateBaseSkuString(prev.name, prev.category, v.color);
+          const unique = getUniqueSku(base, idx, prev.variants);
+          modified = true;
+          return { ...v, sku: unique };
+        }
+        return v;
+      });
+      if (modified) {
+        return { ...prev, variants: updatedVariants };
+      }
+      return prev;
+    });
+  }, [form.name, form.category, form.variants.map(v => v.color).join(',')]);
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   function setField<K extends keyof ProductForm>(key: K, value: ProductForm[K]) {
@@ -202,8 +242,103 @@ export default function ProductFormComponent({
     });
   }
 
+  function generateBaseSkuString(name: string, category: string, color: string): string {
+    const prefix = 'BOM';
+    const catClean = (category || '').trim().toLowerCase();
+    let catPart = 'PRO';
+    if (catClean) {
+      if (catClean.includes('arnes')) catPart = 'ARN';
+      else if (catClean.includes('body')) catPart = 'BOD';
+      else if (catClean.includes('conjunto')) catPart = 'CON';
+      else if (catClean.includes('cachetero')) catPart = 'CAC';
+      else if (catClean.includes('falda')) catPart = 'FAL';
+      else if (catClean.includes('top')) catPart = 'TOP';
+      else if (catClean.includes('accesorio')) catPart = 'ACC';
+      else if (catClean.includes('basico')) catPart = 'BAS';
+      else {
+        const norm = catClean.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+        catPart = norm.substring(0, 3).toUpperCase().padEnd(3, 'X');
+      }
+    }
+    
+    let namePart = 'PRD';
+    const cleanName = (name || '')
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, '');
+    
+    const words = cleanName.split(/\s+/).filter(Boolean);
+    if (words.length > 0) {
+      const filtered = words.filter(w => {
+        const lowerW = w.toLowerCase();
+        const isCat = catClean.includes(lowerW.substring(0, 3)) || lowerW.includes(catClean.substring(0, 3));
+        const isCol = color && (color.toLowerCase().includes(lowerW.substring(0, 3)) || lowerW.includes(color.toLowerCase().substring(0, 3)));
+        return !isCat && !isCol;
+      });
+      const wordsToUse = filtered.length > 0 ? filtered : words;
+      if (wordsToUse.length >= 2) {
+        namePart = wordsToUse.slice(0, 2).map(w => w.substring(0, 3)).join('-');
+      } else {
+        namePart = wordsToUse[0]?.substring(0, 3) || 'PRD';
+      }
+    }
+    
+    let colorPart = '';
+    if (color) {
+      const cleanColor = color
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
+      colorPart = cleanColor.substring(0, 3);
+    }
+    
+    const parts = [prefix, catPart, namePart, colorPart].filter(Boolean);
+    return parts.join('-');
+  }
+
+  function getUniqueSku(baseSku: string, currentVariantIdx: number, variantsList = form.variants): string {
+    let candidate = baseSku;
+    let counter = 2;
+    
+    const isDuplicate = (sku: string) => {
+      const upperSku = sku.toUpperCase();
+      if (existingSkus.includes(upperSku)) return true;
+      return variantsList.some((v, idx) => idx !== currentVariantIdx && v.sku.toUpperCase() === upperSku);
+    };
+
+    while (isDuplicate(candidate)) {
+      candidate = `${baseSku}-${counter}`;
+      counter++;
+    }
+    
+    return candidate;
+  }
+
+  function handleGenerateSku(vIdx: number, force = false) {
+    const variant = form.variants[vIdx];
+    const generatedBase = generateBaseSkuString(form.name, form.category, variant.color);
+    const uniqueSku = getUniqueSku(generatedBase, vIdx);
+
+    if (variant.sku && variant.sku !== uniqueSku && !force) {
+      if (!confirm(`El SKU actual ("${variant.sku}") ya existe o difiere del sugerido. ¿Deseas sobrescribirlo con el sugerido ("${uniqueSku}")?`)) {
+        return;
+      }
+    }
+    
+    setVariant(vIdx, { sku: uniqueSku });
+  }
+
   function addVariant() {
-    setForm((prev) => ({ ...prev, variants: [...prev.variants, defaultVariant()] }));
+    const v = defaultVariant();
+    setForm((prev) => {
+      const nextVariants = [...prev.variants, v];
+      const base = generateBaseSkuString(prev.name, prev.category, v.color);
+      const unique = getUniqueSku(base, nextVariants.length - 1, nextVariants);
+      nextVariants[nextVariants.length - 1] = { ...v, sku: unique };
+      return { ...prev, variants: nextVariants };
+    });
   }
 
   function removeVariant(idx: number) {
@@ -305,6 +440,24 @@ export default function ProductFormComponent({
     e.preventDefault();
     setSaving(true);
     setError(null);
+
+    // 1. Validate form local SKU uniqueness
+    const formSkus = form.variants.map((v) => v.sku.trim().toUpperCase());
+    const uniqueFormSkus = new Set(formSkus);
+    if (uniqueFormSkus.size !== formSkus.length) {
+      setError('Error: Hay SKUs duplicados en las variantes del formulario. Cada variante debe tener un SKU único.');
+      setSaving(false);
+      return;
+    }
+
+    // 2. Validate database SKU uniqueness
+    const duplicatesInDb = formSkus.filter((sku) => existingSkus.includes(sku));
+    if (duplicatesInDb.length > 0) {
+      setError(`Error: Los siguientes SKUs ya están registrados en la base de datos por otros productos: ${duplicatesInDb.join(', ')}. Por favor, edítalos para que sean únicos.`);
+      setSaving(false);
+      return;
+    }
+
     try {
       const dto = formToCreateDto(form);
       if (productId) {
@@ -1020,12 +1173,34 @@ export default function ProductFormComponent({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <Label>SKU *</Label>
-                  <Input
-                    required
-                    value={variant.sku}
-                    onChange={(e) => setVariant(vIdx, { sku: e.target.value })}
-                    placeholder="BT-LP-LEG-001"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      required
+                      value={variant.sku}
+                      onChange={(e) => setVariant(vIdx, { sku: e.target.value })}
+                      placeholder="BT-LP-LEG-001"
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSku(vIdx)}
+                      className="px-3 py-2 text-xs font-display font-bold text-brand-magenta border border-brand-magenta/20 rounded-lg hover:bg-brand-magenta/10 hover:border-brand-magenta/30 transition-all shrink-0 uppercase"
+                    >
+                      {variant.sku ? 'Regenerar' : 'Generar'}
+                    </button>
+                  </div>
+                  {/* Size-specific SKUs preview */}
+                  <div className="mt-2 text-[10px] text-neutral-500 font-mono border border-white/5 bg-brand-dark/25 p-2 rounded">
+                    <span className="font-bold text-neutral-400 block mb-1">Previsualización por Talla:</span>
+                    <div className="grid grid-cols-5 gap-1 text-center">
+                      {variant.stocks.map((s) => (
+                        <div key={s.size} className="bg-brand-charcoal/50 py-0.5 rounded border border-white/5">
+                          <span className="text-brand-magenta font-bold block">{s.size}</span>
+                          <span className="text-[8px] text-neutral-500">{variant.sku ? `${variant.sku}-${s.size}` : '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <Label>Color / Style label</Label>

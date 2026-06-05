@@ -53,10 +53,32 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cart, isLoaded]);
 
+  const getProductMaxQty = (product: Product, size: string): number => {
+    const variant = product.variants?.find((v) =>
+      v.stocks?.some((s) => s.size === size)
+    ) || product.variants?.[0];
+
+    if (!variant) return 0;
+    
+    if (variant.availabilityMode === 'discontinued') {
+      return 0;
+    }
+    if (variant.availabilityMode === 'made_to_order_only' || variant.availabilityMode === 'stock_and_made_to_order') {
+      return 99;
+    }
+    
+    // stock_only
+    const stockEntry = variant.stocks?.find((s) => s.size === size);
+    return stockEntry ? stockEntry.quantity : 0;
+  };
+
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [lastAddedItem, setLastAddedItem] = useState<CartItem | null>(null);
 
   const addToCart = (product: Product, size: string, quantity = 1) => {
+    const maxQty = getProductMaxQty(product, size);
+    let finalQty = quantity;
+
     setCart((prevCart) => {
       const existingItemIndex = prevCart.findIndex(
         (item) => item.product.id === product.id && item.selectedSize === size
@@ -64,19 +86,36 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (existingItemIndex > -1) {
         const newCart = [...prevCart];
-        newCart[existingItemIndex] = {
-          ...newCart[existingItemIndex],
-          quantity: newCart[existingItemIndex].quantity + quantity,
-        };
+        const currentQty = newCart[existingItemIndex].quantity;
+        const requestedQty = currentQty + quantity;
+        
+        if (requestedQty > maxQty) {
+          alert(`Lo sentimos, solo quedan ${maxQty} unidades disponibles en existencia para esta talla.`);
+          finalQty = Math.max(0, maxQty - currentQty);
+          newCart[existingItemIndex] = {
+            ...newCart[existingItemIndex],
+            quantity: maxQty,
+          };
+        } else {
+          newCart[existingItemIndex] = {
+            ...newCart[existingItemIndex],
+            quantity: requestedQty,
+          };
+        }
         return newCart;
       }
 
+      if (quantity > maxQty) {
+        alert(`Lo sentimos, solo quedan ${maxQty} unidades disponibles en existencia para esta talla.`);
+        finalQty = maxQty;
+        return [...prevCart, { product, quantity: maxQty, selectedSize: size }];
+      }
       return [...prevCart, { product, quantity, selectedSize: size }];
     });
 
-    setLastAddedItem({ product, quantity, selectedSize: size });
+    setLastAddedItem({ product, quantity: finalQty, selectedSize: size });
     setShowConfirmation(true);
-    trackAddToCart(product, size, quantity);
+    trackAddToCart(product, size, finalQty);
   };
 
   const removeFromCart = (productId: string, size: string) => {
@@ -91,11 +130,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     setCart((prevCart) =>
-      prevCart.map((item) =>
-        item.product.id === productId && item.selectedSize === size
-          ? { ...item, quantity }
-          : item
-      )
+      prevCart.map((item) => {
+        if (item.product.id === productId && item.selectedSize === size) {
+          const maxQty = getProductMaxQty(item.product, size);
+          if (quantity > maxQty) {
+            alert(`Lo sentimos, solo quedan ${maxQty} unidades disponibles en existencia para esta talla.`);
+            return { ...item, quantity: maxQty };
+          }
+          return { ...item, quantity };
+        }
+        return item;
+      })
     );
   };
 

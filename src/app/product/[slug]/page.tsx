@@ -82,6 +82,64 @@ function getSelectedSizeAvailability(product: ApiProduct, size: string) {
   }
 }
 
+/** Derive size status */
+function getSizeStatus(product: ApiProduct, size: string): 'discontinued' | 'made_to_order' | 'in_stock' | 'out_of_stock' {
+  if (!product.variants || product.variants.length === 0) {
+    return 'out_of_stock';
+  }
+
+  const variant = product.variants.find((v) =>
+    v.stocks?.some((s) => s.size === size)
+  ) || product.variants[0];
+
+  const stockEntry = variant.stocks?.find((s) => s.size === size);
+  const stockQty = stockEntry ? stockEntry.quantity : 0;
+
+  if (variant.availabilityMode === 'discontinued') {
+    return 'discontinued';
+  }
+
+  if (variant.availabilityMode === 'made_to_order_only') {
+    return 'made_to_order';
+  }
+
+  if (variant.availabilityMode === 'stock_and_made_to_order') {
+    if (stockQty > 0) {
+      return 'in_stock';
+    } else {
+      return 'made_to_order';
+    }
+  }
+
+  // default 'stock_only' or fallback
+  if (stockQty > 0) {
+    return 'in_stock';
+  } else {
+    return 'out_of_stock';
+  }
+}
+
+/** Get maximum allowed quantity for a size */
+function getProductMaxQty(product: ApiProduct, size: string): number {
+  if (!size || !product.variants) return 99;
+  const variant = product.variants.find((v) =>
+    v.stocks?.some((s) => s.size === size)
+  ) || product.variants[0];
+
+  if (!variant) return 99;
+  
+  if (variant.availabilityMode === 'discontinued') {
+    return 0;
+  }
+  if (variant.availabilityMode === 'made_to_order_only' || variant.availabilityMode === 'stock_and_made_to_order') {
+    return 99;
+  }
+  
+  // stock_only
+  const stockEntry = variant.stocks?.find((s) => s.size === size);
+  return stockEntry ? stockEntry.quantity : 0;
+}
+
 /** Derive global availability info for the product */
 function getProductGlobalAvailability(product: ApiProduct): {
   type: 'ready-to-ship' | 'crafted-cdmx' | 'limited-drop';
@@ -207,6 +265,11 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
     if (!product) return;
     if (!selectedSize) {
       setErrorFeedback('Por favor selecciona una talla primero.');
+      return;
+    }
+    const availability = getSelectedSizeAvailability(product, selectedSize);
+    if (availability.disabled) {
+      setErrorFeedback('Esta talla no está disponible para compra.');
       return;
     }
     setErrorFeedback('');
@@ -487,24 +550,75 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
               <div className="flex flex-wrap gap-3">
                 {product.sizes.map((size) => {
                   const isActive = selectedSize === size;
+                  const sizeStatus = getSizeStatus(product, size);
+                  let statusClasses = '';
+                  if (isActive) {
+                    statusClasses = 'bg-brand-magenta border-brand-magenta text-black shadow-magenta-glow';
+                  } else {
+                    if (sizeStatus === 'in_stock') {
+                      statusClasses = 'border-brand-magenta text-white bg-transparent hover:border-brand-magenta/80';
+                    } else if (sizeStatus === 'made_to_order') {
+                      statusClasses = 'border-dashed border-brand-magenta/40 text-white bg-transparent hover:border-brand-magenta/80';
+                    } else if (sizeStatus === 'out_of_stock') {
+                      statusClasses = 'border-white/10 text-neutral-600 bg-transparent';
+                    } else if (sizeStatus === 'discontinued') {
+                      statusClasses = 'border-white/10 text-neutral-600 bg-transparent opacity-50';
+                    }
+                  }
                   return (
                     <button
                       key={size}
                       onClick={() => {
                         setSelectedSize(size);
                         setErrorFeedback('');
+                        const maxQty = getProductMaxQty(product, size);
+                        setQuantity((prev) => Math.min(maxQty, prev));
                       }}
-                      className={`min-w-[60px] h-[48px] border text-xs font-display font-black tracking-widest transition-all duration-300 ${
-                        isActive
-                          ? 'bg-brand-magenta border-brand-magenta text-black shadow-magenta-glow'
-                          : 'border-white/10 text-white bg-transparent hover:border-white'
-                      }`}
+                      className={`min-w-[60px] h-[48px] border text-xs font-display font-black tracking-widest transition-all duration-300 ${statusClasses}`}
                     >
                       {size}
                     </button>
                   );
                 })}
               </div>
+
+              {selectedSize && (() => {
+                const status = getSizeStatus(product, selectedSize);
+                const variant = product.variants?.find((v) =>
+                  v.stocks?.some((s) => s.size === selectedSize)
+                ) || product.variants?.[0];
+                const minDays = variant?.madeToOrderMinDays ?? 7;
+                const maxDays = variant?.madeToOrderMaxDays ?? 9;
+
+                if (status === 'made_to_order') {
+                  return (
+                    <div className="flex gap-2 items-center text-xs text-neutral-300 font-sans pt-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-magenta animate-pulse shrink-0" />
+                      <p>
+                        Disponible bajo pedido. Fabricación de <span className="font-bold text-white">{minDays} a {maxDays} días hábiles</span>.
+                      </p>
+                    </div>
+                  );
+                }
+                if (status === 'out_of_stock') {
+                  return (
+                    <div className="flex gap-2 items-center text-xs text-neutral-400 font-sans pt-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 shrink-0" />
+                      <p>Esta talla no está disponible por ahora.</p>
+                    </div>
+                  );
+                }
+                if (status === 'discontinued') {
+                  return (
+                    <div className="flex gap-2 items-center text-xs text-neutral-500 font-sans pt-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-neutral-700 shrink-0" />
+                      <p>Esta talla ya no está disponible.</p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {errorFeedback && <p className="text-xs text-red-500 font-sans font-bold">{errorFeedback}</p>}
             </div>
           )}
@@ -524,12 +638,18 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
                 type="number"
                 min="1"
                 value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => {
+                  const maxQty = getProductMaxQty(product, selectedSize);
+                  setQuantity(Math.min(maxQty, Math.max(1, parseInt(e.target.value) || 1)));
+                }}
                 className="w-12 text-center bg-transparent border-0 font-mono font-bold text-sm text-white focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <button
                 type="button"
-                onClick={() => setQuantity(prev => prev + 1)}
+                onClick={() => {
+                  const maxQty = getProductMaxQty(product, selectedSize);
+                  setQuantity(prev => Math.min(maxQty, prev + 1));
+                }}
                 className="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-white transition-colors text-lg font-bold"
               >
                 +
