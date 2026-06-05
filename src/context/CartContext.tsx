@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ApiProduct as Product } from '@/types/api';
+import { ApiProduct as Product, Variant } from '@/types/api';
 import AddToCartConfirmation from '@/components/ui/AddToCartConfirmation';
 import { trackAddToCart } from '@/lib/analytics';
 
