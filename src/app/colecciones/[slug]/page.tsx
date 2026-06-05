@@ -210,7 +210,7 @@ export default function CollectionDetailPage({ params }: CollectionPageProps) {
       <section className="max-w-xl mx-auto px-4 pt-16">
         <WhatsAppAssist
           text="¿Necesitas ayuda para encontrar el conjunto o talla correcta en este lanzamiento?"
-          linkText="Chat con Estilista"
+          linkText="Chat con una Asesora"
         />
       </section>
     </div>

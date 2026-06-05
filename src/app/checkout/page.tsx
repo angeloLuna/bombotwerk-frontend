@@ -826,7 +826,7 @@ export default function CheckoutPage() {
 
             {/* WhatsApp assist links */}
             <WhatsAppAssist
-              text="¿Necesitas confirmación inmediata de un estilista?"
+              text="¿Necesitas confirmación inmediata de una asesora?"
               linkText="Chat Directo"
             />
 

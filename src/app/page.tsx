@@ -376,7 +376,7 @@ export default function HomePage() {
 
             <div className="pt-4">
               <a 
-                href="https://wa.me/5215555555555" 
+                href="https://wa.me/5215582470356" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 onClick={() => trackWhatsAppClick('home_atelier_details')}

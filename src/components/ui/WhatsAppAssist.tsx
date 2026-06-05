@@ -11,12 +11,12 @@ interface WhatsAppAssistProps {
 
 const WhatsAppAssist: React.FC<WhatsAppAssistProps> = ({
   text = '¿Necesitas ayuda para elegir tu talla?',
-  linkText = 'Chatea con un estilista.',
+  linkText = 'Chatea con una asesora.',
   className = '',
   location = 'pdp_assistant',
 }) => {
   const message = encodeURIComponent("¡Hola! Estoy navegando en la tienda de Bombo Twerk y me gustaría recibir asesoría sobre tallas y estilos.");
-  const waUrl = `https://wa.me/5215555555555?text=${message}`;
+  const waUrl = `https://wa.me/5215582470356?text=${message}`;
 
   return (
     <div

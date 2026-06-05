@@ -160,14 +160,14 @@ const Navigation: React.FC = () => {
 
             <div className="mt-auto border-t border-white/5 pt-6 space-y-4">
               <a
-                href="https://wa.me/5215555555555?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20ayuda%20con%20las%20tallas%20y%20selecci%C3%B3n%20de%20prendas%20en%20Bombo%20Twerk%21"
+                href="https://wa.me/5215582470356?text=Hola%2C%20me%20gustar%C3%ADa%20recibir%20ayuda%20con%20las%20tallas%20y%20selecci%C3%B3n%20de%20prendas%20en%20Bombo%20Twerk%21"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => trackWhatsAppClick('nav_mobile_drawer')}
                 className="flex items-center gap-3 text-sm text-neutral-400 hover:text-white transition-colors"
               >
                 <MessageSquare className="w-4 h-4 text-brand-magenta" />
-                <span>Hablar con un Estilista</span>
+                <span>Hablar con una Asesora</span>
               </a>
               <p className="text-[10px] text-neutral-500 tracking-wider">
                 DISEÑADO EN CDMX. EST. 2026
@@ -235,16 +235,16 @@ const Navigation: React.FC = () => {
           <span className="text-[10px] tracking-widest font-display font-medium">EXCLUSIVO</span>
         </Link>
 
-        {/* Tab 3: Estilista */}
+        {/* Tab 3: Asesora */}
         <a
-          href="https://wa.me/5215555555555?text=Hola!%20Me%20gustar%C3%ADa%20chatear%20con%20un%20estilista%20sobre%20tallas%20y%20opciones%20de%20dise%C3%B1o."
+          href="https://wa.me/5215582470356?text=Hola!%20Me%20gustar%C3%ADa%20chatear%20con%20una%20asesora%20sobre%20tallas%20y%20opciones%20de%20dise%C3%B1o."
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => trackWhatsAppClick('nav_mobile_bar')}
           className="flex flex-col items-center gap-1 text-neutral-400 hover:text-white transition-colors"
         >
           <MessageSquare className="w-5 h-5 text-brand-magenta animate-pulse" />
-          <span className="text-[10px] tracking-widest font-display font-medium">ESTILISTA</span>
+          <span className="text-[10px] tracking-widest font-display font-medium">ASESORA</span>
         </a>
 
         {/* Tab 4: Buscar */}

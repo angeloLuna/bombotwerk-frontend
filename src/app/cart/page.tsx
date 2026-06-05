@@ -234,7 +234,7 @@ export default function CartPage() {
         {/* WhatsApp styling advice assist */}
         <WhatsAppAssist 
           text="¿Necesitas ayuda para elegir tu talla o tiempos antes de pagar?" 
-          linkText="Pregunta a un Estilista del Atelier"
+          linkText="Pregunta a una Asesora del Atelier"
         />
 
         {/* COMPLETE THE LOOK ACCESORIES RECOMMENDED */}

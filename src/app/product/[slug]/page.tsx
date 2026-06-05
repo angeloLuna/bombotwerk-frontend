@@ -736,7 +736,7 @@ export default function ProductDetailPage({ params }: ProductPageProps) {
           <div className="flex gap-2.5 items-start bg-brand-charcoal/50 border border-white/5 p-4 text-xs font-sans text-neutral-400 leading-relaxed rounded-xl">
             <Info className="w-4 h-4 text-brand-magenta shrink-0 mt-0.5" />
             <p>
-              Diseñado para esculpir, ajustar y moverse contigo. Tallaje de rendimiento estándar mexicano. Elige tu talla habitual o chatea con un estilista del atelier si tienes dudas.
+              Diseñado para esculpir, ajustar y moverse contigo. Tallaje de rendimiento estándar mexicano. Elige tu talla habitual o chatea con una asesora del atelier si tienes dudas.
             </p>
           </div>
 
