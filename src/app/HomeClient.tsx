@@ -464,9 +464,9 @@ export default function HomeClient({ initialProducts, initialCollections }: Home
       <footer className="py-12 border-t border-white/5 text-center text-[10px] text-neutral-600 tracking-widest bg-brand-dark flex flex-col space-y-4">
         <span suppressHydrationWarning>© {new Date().getFullYear()} BOMBO TWERK. TODOS LOS DERECHOS RESERVADOS.</span>
         <div className="flex justify-center gap-6 text-neutral-400 flex-wrap">
-          <a href="#" className="hover:text-brand-magenta transition-colors">GUÍA DE TALLAS</a>
-          <a href="#" className="hover:text-brand-magenta transition-colors">ENVÍOS Y TIEMPOS DE ENTREGA</a>
-          <a href="#" className="hover:text-brand-magenta transition-colors">CONTACTAR ATELIER</a>
+          <Link href="/guia-de-tallas" className="hover:text-brand-magenta transition-colors">GUÍA DE TALLAS</Link>
+          <Link href="/envios-y-tiempos" className="hover:text-brand-magenta transition-colors">ENVÍOS Y TIEMPOS DE ENTREGA</Link>
+          <Link href="/contacto" className="hover:text-brand-magenta transition-colors">CONTACTAR ATELIER</Link>
           <Link href="/privacy" className="hover:text-brand-magenta transition-colors">AVISO DE PRIVACIDAD</Link>
         </div>
         <div className="flex justify-center items-center gap-1.5 text-neutral-500 pt-2">

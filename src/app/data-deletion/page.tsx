@@ -1,17 +1,53 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { getOrganizationJsonLd, getWebPageJsonLd, getBreadcrumbListJsonLd } from '@/lib/seo';
+
+const title = 'Eliminación de Datos | Bombo Twerk';
+const description = 'Instrucciones paso a paso para solicitar la eliminación de datos de usuario y la desvinculación de cuentas en la tienda Bombo Twerk.';
 
 export const metadata: Metadata = {
-  title: 'Eliminación de datos de usuario | Bombo Twerk',
-  description: 'Instrucciones para solicitar la eliminación de datos de usuario en Bombo Twerk.',
+  title,
+  description,
   alternates: {
     canonical: 'https://bombotwerk.com/data-deletion',
+  },
+  openGraph: {
+    title,
+    description,
+    url: 'https://bombotwerk.com/data-deletion',
+    siteName: 'Bombo Twerk',
+    locale: 'es_MX',
+    type: 'article',
+  },
+  twitter: {
+    card: 'summary',
+    title,
+    description,
   },
 };
 
 export default function DataDeletionPage() {
+  const orgJsonLd = getOrganizationJsonLd();
+  const pageJsonLd = getWebPageJsonLd(title, description, 'https://bombotwerk.com/data-deletion');
+  const breadcrumbJsonLd = getBreadcrumbListJsonLd([
+    { name: 'Inicio', item: 'https://bombotwerk.com' },
+    { name: 'Eliminación de Datos', item: 'https://bombotwerk.com/data-deletion' },
+  ]);
+
   return (
     <div className="min-h-screen bg-brand-dark">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       {/* Hero header */}
       <div className="relative pt-32 pb-16 px-6 text-center bg-gradient-to-b from-brand-plum via-brand-dark to-brand-dark border-b border-white/5">
         <div className="absolute inset-0 bg-gradient-to-r from-brand-magenta/5 via-transparent to-brand-magenta/5 pointer-events-none" />

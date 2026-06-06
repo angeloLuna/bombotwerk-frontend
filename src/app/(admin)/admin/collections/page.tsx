@@ -179,6 +179,16 @@ export default function AdminCollectionsPage() {
                 </div>
               </div>
 
+              {(!editing.seoDescription || !(editing.coverImageUrl || editing.heroImageUrl || editing.bgImage)) && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-[11px] text-amber-500 space-y-1">
+                  <p className="font-bold">Advertencias de SEO no bloqueantes:</p>
+                  <ul className="list-disc list-inside space-y-0.5 font-sans">
+                    {!editing.seoDescription && <li>Esta colección está publicada pero no tiene SEO description.</li>}
+                    {!(editing.coverImageUrl || editing.heroImageUrl || editing.bgImage) && <li>Esta colección está publicada pero no tiene imagen principal.</li>}
+                  </ul>
+                </div>
+              )}
+
               <SeoFieldsGroup
                 seoTitle={editing.seoTitle ?? ''}
                 seoDescription={editing.seoDescription ?? ''}
@@ -376,6 +386,16 @@ export default function AdminCollectionsPage() {
                 </div>
               </div>
             </div>
+
+            {(!newForm.seoDescription || !(newForm.coverImageUrl || newForm.heroImageUrl || newForm.bgImage)) && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 text-[11px] text-amber-500 space-y-1">
+                <p className="font-bold">Advertencias de SEO no bloqueantes:</p>
+                <ul className="list-disc list-inside space-y-0.5 font-sans">
+                  {!newForm.seoDescription && <li>Esta colección está publicada pero no tiene SEO description.</li>}
+                  {!(newForm.coverImageUrl || newForm.heroImageUrl || newForm.bgImage) && <li>Esta colección está publicada pero no tiene imagen principal.</li>}
+                </ul>
+              </div>
+            )}
 
             <SeoFieldsGroup
               seoTitle={newForm.seoTitle ?? ''}

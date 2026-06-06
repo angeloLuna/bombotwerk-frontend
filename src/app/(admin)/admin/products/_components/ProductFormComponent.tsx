@@ -557,6 +557,16 @@ export default function ProductFormComponent({
         </div>
       )}
 
+      {form.isActive && (!form.seoTitle || !form.seoDescription) && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 text-xs text-amber-500 space-y-1">
+          <p className="font-bold">Advertencias de SEO no bloqueantes:</p>
+          <ul className="list-disc list-inside space-y-0.5 font-sans">
+            {!form.seoTitle && <li>Este producto está publicado pero no tiene SEO title.</li>}
+            {!form.seoDescription && <li>Este producto está publicado pero no tiene SEO description.</li>}
+          </ul>
+        </div>
+      )}
+
       {/* ── BASIC INFO ── */}
       <SectionCard title="Basic Information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

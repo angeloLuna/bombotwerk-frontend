@@ -5,36 +5,55 @@ export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://bombotwerk.com';
+  const stableDate = new Date('2026-06-06');
 
   // Static routes
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
-      lastModified: new Date(),
+      lastModified: stableDate,
       changeFrequency: 'daily',
       priority: 1.0,
     },
     {
       url: `${baseUrl}/tienda`,
-      lastModified: new Date(),
+      lastModified: stableDate,
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
       url: `${baseUrl}/colecciones`,
-      lastModified: new Date(),
+      lastModified: stableDate,
       changeFrequency: 'weekly',
       priority: 0.8,
     },
     {
+      url: `${baseUrl}/guia-de-tallas`,
+      lastModified: stableDate,
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    },
+    {
+      url: `${baseUrl}/envios-y-tiempos`,
+      lastModified: stableDate,
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    },
+    {
+      url: `${baseUrl}/contacto`,
+      lastModified: stableDate,
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    },
+    {
       url: `${baseUrl}/privacy`,
-      lastModified: new Date(),
+      lastModified: stableDate,
       changeFrequency: 'monthly',
       priority: 0.3,
     },
     {
       url: `${baseUrl}/data-deletion`,
-      lastModified: new Date(),
+      lastModified: stableDate,
       changeFrequency: 'monthly',
       priority: 0.3,
     },
@@ -55,9 +74,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           return null;
         }
         uniqueProductUrls.add(url);
+
+        let lastModDate = stableDate;
+        if ((product as any).updatedAt) {
+          lastModDate = new Date((product as any).updatedAt);
+        }
+
         return {
           url,
-          lastModified: new Date(),
+          lastModified: lastModDate,
           changeFrequency: 'weekly' as const,
           priority: 0.7,
         };
@@ -80,9 +105,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           return null;
         }
         uniqueCollectionUrls.add(url);
+
+        let lastModDate = stableDate;
+        if ((collection as any).updatedAt) {
+          lastModDate = new Date((collection as any).updatedAt);
+        }
+
         return {
           url,
-          lastModified: new Date(),
+          lastModified: lastModDate,
           changeFrequency: 'weekly' as const,
           priority: 0.6,
         };

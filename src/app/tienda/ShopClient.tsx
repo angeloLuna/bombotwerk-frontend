@@ -31,10 +31,10 @@ const SORT_OPTIONS = [
   { label: 'Precio mayor', value: 'price_desc' },
 ];
 
-function ShopContent() {
+function ShopContent({ initialProducts }: { initialProducts: ApiProduct[] }) {
   const searchParams = useSearchParams();
-  const [products, setProducts] = useState<ApiProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<ApiProduct[]>(initialProducts);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filter & Search states
@@ -104,14 +104,24 @@ function ShopContent() {
     }
   }, [selectedCategory, selectedAvailability, selectedSort, searchQuery, selectedSale]);
 
+  const [isInitialRender, setIsInitialRender] = useState(true);
+
   // Debounced fetch to handle search typing smoothly
   useEffect(() => {
+    if (isInitialRender) {
+      setIsInitialRender(false);
+      const hasParams = Array.from(searchParams.keys()).length > 0;
+      if (!hasParams && searchQuery === '' && !selectedAvailability && !selectedSale) {
+        return;
+      }
+    }
+
     const timer = setTimeout(() => {
       fetchProducts();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [fetchProducts]);
+  }, [fetchProducts, searchParams, isInitialRender, searchQuery, selectedAvailability, selectedSale]);
 
   return (
     <div className="w-full min-h-[90vh] bg-brand-dark pb-24 text-left">
@@ -618,10 +628,39 @@ function ShopContent() {
   );
 }
 
-export default function ShopClient() {
+function ShopFallback({ products }: { products: ApiProduct[] }) {
   return (
-    <Suspense fallback={<LoadingSpinner message="CARGANDO TIENDA..." />}>
-      <ShopContent />
+    <div className="w-full min-h-[90vh] bg-brand-dark pb-24 text-left">
+      <section className="px-4 md:px-8 pt-6 pb-2 text-left space-y-1">
+        <h2 className="text-2xl font-serif text-white uppercase tracking-wide">
+          Tienda
+        </h2>
+        <p className="text-xs text-neutral-400 font-sans font-light tracking-wide">
+          Cacheteros, bodys, arneses y básicos para moverte.
+        </p>
+      </section>
+
+      <section className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
+        {products.length === 0 ? (
+          <div className="flex items-center justify-center py-20">
+            <LoadingSpinner message="Cargando catálogo..." />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+export default function ShopClient({ initialProducts = [] }: { initialProducts?: ApiProduct[] }) {
+  return (
+    <Suspense fallback={<ShopFallback products={initialProducts} />}>
+      <ShopContent initialProducts={initialProducts} />
     </Suspense>
   );
 }
