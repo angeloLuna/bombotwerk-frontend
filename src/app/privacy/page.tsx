@@ -4,6 +4,9 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: 'Aviso de Privacidad | Bombo Twerk',
   description: 'Aviso de Privacidad de Bombo Twerk.',
+  alternates: {
+    canonical: 'https://bombotwerk.com/privacy',
+  },
 };
 
 export default function PrivacyPage() {

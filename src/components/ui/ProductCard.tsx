@@ -28,7 +28,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, className = '' }) =>
   }
 
   const primaryImageUrl = primaryImgObj?.url || product.images?.[0] || 'https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=800';
-  const primaryAlt = primaryImgObj?.alt || name;
+  const primaryAlt = primaryImgObj?.alt || `${product.name} ${product.category || ''} Bombo Twerk`.trim();
 
   // 2. Resolve Hover Image (must be different from primary)
   let hoverImgObj = rawImages.find((img) => img.type === 'catalog' && img.url !== primaryImageUrl);

@@ -69,6 +69,10 @@ export interface ApiProduct {
   sizes: string[];         // extracted from variants[].stocks[].size
   availability: 'ready-to-ship' | 'crafted-cdmx' | 'limited-drop';
   availabilityText: string;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoKeywords?: string | null;
+  canonicalSlug?: string | null;
 }
 
 export interface ApiCollection {
@@ -81,4 +85,8 @@ export interface ApiCollection {
   coverImageUrl?: string | null;
   heroImageUrl?: string | null;
   products?: ApiProduct[];
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoKeywords?: string | null;
+  imageAltText?: string | null;
 }

@@ -4,6 +4,9 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: 'Eliminación de datos de usuario | Bombo Twerk',
   description: 'Instrucciones para solicitar la eliminación de datos de usuario en Bombo Twerk.',
+  alternates: {
+    canonical: 'https://bombotwerk.com/data-deletion',
+  },
 };
 
 export default function DataDeletionPage() {

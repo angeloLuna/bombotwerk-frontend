@@ -70,8 +70,11 @@ export async function getProducts(filters?: ProductFilters): Promise<ApiProduct[
 }
 
 /** GET /api/products/:slug */
-export async function getProductBySlug(slug: string): Promise<ApiProduct> {
-  const data = await request<ApiProduct>(`/products/${slug}`);
+export async function getProductBySlug(slug: string): Promise<ApiProduct | { redirect: true; destination: string }> {
+  const data = await request<any>(`/products/${slug}`);
+  if (data && data.redirect) {
+    return data;
+  }
   return normaliseProduct(data);
 }
 
@@ -81,8 +84,11 @@ export async function getCollections(): Promise<ApiCollection[]> {
 }
 
 /** GET /api/collections/:slug */
-export async function getCollectionBySlug(slug: string): Promise<ApiCollection> {
-  const data = await request<ApiCollection>(`/collections/${slug}`);
+export async function getCollectionBySlug(slug: string): Promise<ApiCollection | { redirect: true; destination: string }> {
+  const data = await request<any>(`/collections/${slug}`);
+  if (data && data.redirect) {
+    return data;
+  }
   return {
     ...data,
     products: data.products?.map(normaliseProduct),

@@ -31,6 +31,10 @@ export interface AdminCollection {
   _count?: { products: number };
   createdAt?: string;
   updatedAt?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string;
+  imageAltText?: string;
 }
 
 export interface AdminProduct {
@@ -51,6 +55,10 @@ export interface AdminProduct {
   images?: ProductImage[];
   createdAt: string;
   updatedAt: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  seoKeywords?: string;
+  canonicalSlug?: string;
 }
 
 // ─── Form state types ──────────────────────────────────────────────────────────
@@ -84,6 +92,10 @@ export interface ProductForm {
   compareAtPrice: string;  // string in the form, converted to number on submit
   mediaUrls: string[];
   variants: VariantForm[];
+  seoTitle: string;
+  seoDescription: string;
+  seoKeywords: string;
+  canonicalSlug: string;
 }
 
 export const DEFAULT_SIZES = ['XCH', 'CH', 'M', 'G', 'XG'];
@@ -122,6 +134,10 @@ export function defaultProductForm(): ProductForm {
     compareAtPrice: '',
     mediaUrls: [''],
     variants: [defaultVariant()],
+    seoTitle: '',
+    seoDescription: '',
+    seoKeywords: '',
+    canonicalSlug: '',
   };
 }
 
@@ -156,6 +172,10 @@ export function formToCreateDto(form: ProductForm) {
         alt: img.alt || undefined,
       })) : undefined,
     })),
+    seoTitle: form.seoTitle || undefined,
+    seoDescription: form.seoDescription || undefined,
+    seoKeywords: form.seoKeywords || undefined,
+    canonicalSlug: form.canonicalSlug || undefined,
   };
 }
 
@@ -207,6 +227,10 @@ export function productToForm(p: AdminProduct): ProductForm {
             };
           })
         : [defaultVariant()],
+    seoTitle: p.seoTitle ?? '',
+    seoDescription: p.seoDescription ?? '',
+    seoKeywords: p.seoKeywords ?? '',
+    canonicalSlug: p.canonicalSlug ?? '',
   };
 }
 

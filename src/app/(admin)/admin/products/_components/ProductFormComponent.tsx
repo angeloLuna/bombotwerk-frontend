@@ -11,6 +11,7 @@ import type {
 import { defaultVariant, defaultSizeStocks, formToCreateDto } from '@/types/admin';
 import { adminApi } from '@/lib/admin-api';
 import { Plus, Trash2, Loader2, ChevronDown, GripVertical, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
+import SeoFieldsGroup from '../../_components/SeoFieldsGroup';
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
@@ -1527,6 +1528,25 @@ export default function ProductFormComponent({
           <Plus className="w-3.5 h-3.5" /> ADD VARIANT
         </button>
       </SectionCard>
+
+      <SeoFieldsGroup
+        seoTitle={form.seoTitle}
+        seoDescription={form.seoDescription}
+        seoKeywords={form.seoKeywords}
+        extraField={{
+          name: 'canonicalSlug',
+          label: 'Slug Canónico (canonicalSlug)',
+          placeholder: 'latin-pulse-legging-alternative',
+          value: form.canonicalSlug,
+          onChange: (val) => setField('canonicalSlug', val),
+        }}
+        onChangeTitle={(val) => setField('seoTitle', val)}
+        onChangeDescription={(val) => setField('seoDescription', val)}
+        onChangeKeywords={(val) => setField('seoKeywords', val)}
+        defaultSlug={form.slug}
+        previewPrefix="product"
+        fallbackName={form.name}
+      />
     </form>
   );
 }
