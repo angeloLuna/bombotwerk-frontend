@@ -8,6 +8,7 @@ const nextConfig = {
     '*.ngrok-free.app',
     '*.ngrok-free.dev',
     'reiko-overoffensive-unpessimistically.ngrok-free.dev',
+    'vineyard-unclog-happily.ngrok-free.dev',
     '*.ngrok.io',
   ],
 
