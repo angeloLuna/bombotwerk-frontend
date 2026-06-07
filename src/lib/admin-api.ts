@@ -1,4 +1,5 @@
 import type { AdminProduct, AdminCollection, AdminOrder, AdminUser, AdminUserDetail, AdminActivityLog, AdminAuditLog, AdminDashboardSummary } from '@/types/admin';
+import type { ProductTypeCard } from '@/types/merchandising';
 import { getSession } from 'next-auth/react';
 
 const BASE =
@@ -269,6 +270,34 @@ export const adminApi = {
         totalPages: number;
         data: AdminActivityLog[];
       }>(`/logs/activity${queryString ? `?${queryString}` : ''}`);
+    },
+  },
+
+  merchandising: {
+    productTypeCards: {
+      list: () => req<ProductTypeCard[]>('/merchandising/product-type-cards'),
+      create: (body: object) =>
+        req<ProductTypeCard>('/merchandising/product-type-cards', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+      update: (id: string, body: object) =>
+        req<ProductTypeCard>(`/merchandising/product-type-cards/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        }),
+      delete: (id: string) =>
+        req<{ success: boolean }>(`/merchandising/product-type-cards/${id}`, {
+          method: 'DELETE',
+        }),
+      uploadImage: (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return req<{ url: string; key: string }>('/merchandising/product-type-cards/upload', {
+          method: 'POST',
+          body: formData,
+        });
+      },
     },
   },
 };

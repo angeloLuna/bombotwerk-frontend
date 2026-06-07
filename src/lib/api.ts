@@ -6,6 +6,7 @@
  */
 
 import type { ApiProduct, ApiCollection } from '@/types/api';
+import type { ProductTypeCard } from '@/types/merchandising';
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:4000';
@@ -93,6 +94,11 @@ export async function getCollectionBySlug(slug: string): Promise<ApiCollection |
     ...data,
     products: data.products?.map(normaliseProduct),
   };
+}
+
+/** GET /api/merchandising/product-type-cards */
+export async function getProductTypeCards(): Promise<ProductTypeCard[]> {
+  return request<ProductTypeCard[]>('/merchandising/product-type-cards');
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────

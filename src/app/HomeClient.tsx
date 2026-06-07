@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { getProducts, getCollections } from '@/lib/api';
+import { getProducts, getCollections, getProductTypeCards } from '@/lib/api';
 import type { ApiProduct, ApiCollection } from '@/types/api';
+import type { ProductTypeCard } from '@/types/merchandising';
 import Section from '@/components/ui/Section';
 import Button from '@/components/ui/Button';
 import ProductCard from '@/components/ui/ProductCard';
@@ -21,6 +22,7 @@ interface HomeClientProps {
 export default function HomeClient({ initialProducts, initialCollections }: HomeClientProps) {
   const [products, setProducts] = useState<ApiProduct[]>(initialProducts);
   const [collections, setCollections] = useState<ApiCollection[]>(initialCollections);
+  const [typeCards, setTypeCards] = useState<ProductTypeCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,56 +30,117 @@ export default function HomeClient({ initialProducts, initialCollections }: Home
     setLoading(true);
     setError(null);
     try {
-      const [prods, cols] = await Promise.all([getProducts(), getCollections()]);
+      const [prods, cols, cards] = await Promise.all([
+        getProducts(),
+        getCollections(),
+        getProductTypeCards().catch((e) => {
+          console.error('Error fetching homepage merchandising cards, falling back to static:', e);
+          return [];
+        })
+      ]);
       setProducts(prods);
       setCollections(cols);
+      if (cards && cards.length > 0) {
+        setTypeCards(cards);
+      } else {
+        setTypeCards(staticCategoryCards);
+      }
     } catch (e: any) {
       setError(e?.message ?? 'Error al cargar los datos de la tienda.');
+      setTypeCards(staticCategoryCards);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 1. Category cards configuration
-  const categoryCards = [
+  // 1. Static Category cards fallback configuration
+  const staticCategoryCards: ProductTypeCard[] = [
     {
+      id: 'static-1',
+      slug: 'cacheteros',
       title: 'Cacheteros',
       href: '/tienda?category=cacheteros',
-      image: 'https://images.unsplash.com/photo-1506152983158-b4a74a01c721?q=80&w=600',
+      imageUrl: 'https://images.unsplash.com/photo-1506152983158-b4a74a01c721?q=80&w=600',
       description: 'Diseñados para comodidad y movimiento',
+      highlight: false,
+      sortOrder: 0,
+      isActive: true,
     },
     {
+      id: 'static-2',
+      slug: 'bodys',
       title: 'Bodys',
       href: '/tienda?category=bodys',
-      image: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=600',
+      imageUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=600',
       description: 'Compresión estructural de alta intensidad',
+      highlight: false,
+      sortOrder: 1,
+      isActive: true,
     },
     {
+      id: 'static-3',
+      slug: 'conjuntos',
       title: 'Conjuntos',
       href: '/tienda?category=conjuntos',
-      image: 'https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=600',
+      imageUrl: 'https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=600',
       description: 'Estilo coordinado listo para destacar',
+      highlight: false,
+      sortOrder: 2,
+      isActive: true,
     },
     {
+      id: 'static-4',
+      slug: 'faldas-flecos',
       title: 'Faldas y Flecos',
       href: '/tienda?category=faldas-flecos',
-      image: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=600',
+      imageUrl: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=600',
       description: 'Siluetas fluidas que siguen tu ritmo',
+      highlight: false,
+      sortOrder: 3,
+      isActive: true,
     },
     {
+      id: 'static-5',
+      slug: 'arneses',
       title: 'Arneses',
       href: '/tienda?category=arneses',
-      image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=600',
+      imageUrl: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=600',
       description: 'Completa tu arsenal con accesorios',
+      highlight: false,
+      sortOrder: 4,
+      isActive: true,
     },
     {
+      id: 'static-6',
+      slug: 'ofertas',
       title: 'Ofertas',
       href: '/tienda?sale=true',
-      image: 'https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?q=80&w=600',
+      imageUrl: 'https://images.unsplash.com/photo-1504609773096-104ff2c73ba4?q=80&w=600',
       description: 'Promociones y últimas piezas en stock',
       highlight: true,
+      badgeLabel: 'OFERTA',
+      sortOrder: 5,
+      isActive: true,
     },
   ];
+
+  const activeCategoryCards = typeCards.length > 0 ? typeCards : staticCategoryCards;
+
+  useEffect(() => {
+    let active = true;
+    getProductTypeCards()
+      .then((cards) => {
+        if (active && cards && cards.length > 0) {
+          setTypeCards(cards);
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching type cards on load:', err);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // 2. Filter active collections (maximum 4)
   const featuredCollections = collections.slice(0, 4);
@@ -191,44 +254,60 @@ export default function HomeClient({ initialProducts, initialCollections }: Home
         bg="charcoal"
       >
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-6xl mx-auto">
-          {categoryCards.map((cat, idx) => (
-            <Link
-              key={idx}
-              href={cat.href}
-              className={`group relative aspect-[4/3] w-full overflow-hidden border rounded-2xl transition-all duration-500 flex flex-col justify-end p-4 md:p-6 ${cat.highlight
-                ? 'border-brand-magenta/30 hover:border-brand-magenta hover:shadow-magenta-glow'
-                : 'border-white/5 hover:border-brand-magenta/20'
+          {activeCategoryCards.map((cat, idx) => {
+            const bgImg = cat.imageUrl || 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=600';
+            const isOffer = cat.badgeLabel?.toLowerCase().includes('oferta') || cat.badgeLabel?.includes('%') || cat.badgeType === 'offer' || cat.highlight;
+            const isNew = cat.badgeLabel?.toLowerCase().includes('nuev') || cat.badgeType === 'new';
+
+            return (
+              <Link
+                key={idx}
+                href={cat.href}
+                className={`group relative aspect-[4/3] w-full overflow-hidden border rounded-2xl transition-all duration-500 flex flex-col justify-end p-4 md:p-6 ${
+                  cat.highlight
+                    ? 'border-brand-magenta/30 hover:border-brand-magenta hover:shadow-magenta-glow'
+                    : 'border-white/5 hover:border-brand-magenta/20'
                 }`}
-            >
-              {/* Background Image */}
-              <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
-                style={{ backgroundImage: `url('${cat.image}')` }}
-              />
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-transparent transition-opacity duration-300 group-hover:opacity-95" />
+              >
+                {/* Background Image */}
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-105"
+                  style={{ backgroundImage: `url('${bgImg}')` }}
+                />
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-transparent transition-opacity duration-300 group-hover:opacity-95" />
 
-              {/* Tag / Icon for highlighted sale */}
-              {cat.highlight && (
-                <div className="absolute top-4 right-4 bg-brand-magenta text-black text-[9px] font-black tracking-widest px-2.5 py-1 rounded flex items-center gap-1 shadow-md">
-                  <Percent className="w-3 h-3" /> OFERTA
-                </div>
-              )}
+                {/* Tag / Icon for highlighted sale or custom badge */}
+                {(cat.badgeLabel || cat.highlight) && (
+                  <div className="absolute top-4 right-4 bg-brand-magenta text-black text-[9px] font-black tracking-widest px-2.5 py-1 rounded flex items-center gap-1 shadow-md uppercase">
+                    {isNew ? (
+                      <Sparkles className="w-3 h-3" />
+                    ) : isOffer ? (
+                      <Percent className="w-3 h-3" />
+                    ) : (
+                      <Zap className="w-3 h-3" />
+                    )}
+                    {cat.badgeLabel || 'OFERTA'}
+                  </div>
+                )}
 
-              {/* Card Content */}
-              <div className="relative z-10 space-y-1 text-left">
-                <h3 className="font-display font-black text-lg md:text-2xl tracking-wider text-white group-hover:text-brand-magenta transition-colors uppercase">
-                  {cat.title}
-                </h3>
-                <p className="text-[10px] md:text-xs text-neutral-400 line-clamp-1 leading-normal">
-                  {cat.description}
-                </p>
-                <div className="pt-2 opacity-0 group-hover:opacity-100 -translate-y-2 group-hover:translate-y-0 transition-all duration-300 flex items-center gap-1.5 text-[9px] md:text-[10px] font-display font-black tracking-widest text-brand-magenta">
-                  EXPLORAR <ArrowRight className="w-3 h-3" />
+                {/* Card Content */}
+                <div className="relative z-10 space-y-1 text-left">
+                  <h3 className="font-display font-black text-lg md:text-2xl tracking-wider text-white group-hover:text-brand-magenta transition-colors uppercase">
+                    {cat.title}
+                  </h3>
+                  {cat.description && (
+                    <p className="text-[10px] md:text-xs text-neutral-400 line-clamp-1 leading-normal">
+                      {cat.description}
+                    </p>
+                  )}
+                  <div className="pt-2 opacity-0 group-hover:opacity-100 -translate-y-2 group-hover:translate-y-0 transition-all duration-300 flex items-center gap-1.5 text-[9px] md:text-[10px] font-display font-black tracking-widest text-brand-magenta">
+                    EXPLORAR <ArrowRight className="w-3 h-3" />
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </Section>
 

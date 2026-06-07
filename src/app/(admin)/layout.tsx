@@ -15,6 +15,7 @@ import {
   LogOut,
   Users,
   ClipboardList,
+  LayoutGrid,
 } from 'lucide-react';
 
 
@@ -27,6 +28,7 @@ const NAV: Array<{
   { label: 'Products', href: '/admin/products', icon: Package },
   { label: 'Collections', href: '/admin/collections', icon: Layers },
   { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+  { label: 'Merchandising', href: '/admin/merchandising', icon: LayoutGrid },
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Audit Log', href: '/admin/audit-log', icon: ClipboardList },
 ];
