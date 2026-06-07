@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, ShoppingBag, Search, User, Sparkles, MessageSquare, Compass } from 'lucide-react';
+import { Menu, X, ShoppingBag, Search, User, Sparkles, MessageSquare, Compass, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { trackWhatsAppClick } from '@/lib/analytics';
+import { getCollections } from '@/lib/api';
+import type { ApiCollection } from '@/types/api';
 
 const Navigation: React.FC = () => {
   const pathname = usePathname();
@@ -26,14 +28,36 @@ const Navigation: React.FC = () => {
   }
 
 
+  const [collections, setCollections] = useState<ApiCollection[]>([]);
+  const [isCollectionsOpen, setIsCollectionsOpen] = useState(false);
+  const [loadingCollections, setLoadingCollections] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const loadCollections = async () => {
+      setLoadingCollections(true);
+      try {
+        const data = await getCollections();
+        if (active) {
+          setCollections(data);
+        }
+      } catch (e) {
+        console.error('Error fetching navigation collections:', e);
+      } finally {
+        if (active) {
+          setLoadingCollections(false);
+        }
+      }
+    };
+    loadCollections();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const navLinks = [
     { name: 'INICIO', path: '/' },
     { name: 'TIENDA', path: '/tienda' },
-    { name: 'COLECCIONES', path: '/colecciones' },
-    { name: 'LATIN PULSE', path: '/colecciones/latin-pulse' },
-    { name: 'NOCTURNAL PULSE', path: '/colecciones/nocturnal-pulse' },
-    { name: 'VELVET MOTION', path: '/colecciones/velvet-motion' },
-    { name: 'TU ARSENAL (CARRITO)', path: '/cart' },
   ];
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -105,7 +129,7 @@ const Navigation: React.FC = () => {
               </button>
             </div>
 
-            <nav className="flex-1 flex flex-col space-y-6">
+            <nav className="flex-1 flex flex-col space-y-6 overflow-y-auto pr-2">
               {navLinks.map((link) => {
                 const isActive = pathname === link.path;
                 return (
@@ -121,6 +145,71 @@ const Navigation: React.FC = () => {
                   </Link>
                 );
               })}
+
+              {/* Dynamic Accordion for Colecciones */}
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCollectionsOpen(!isCollectionsOpen)}
+                  className={`flex items-center justify-between w-full font-sans text-lg font-medium tracking-wider hover:text-brand-magenta transition-colors text-left focus:outline-none ${
+                    pathname?.startsWith('/colecciones') ? 'text-brand-magenta font-bold border-l-2 border-brand-magenta pl-3' : 'text-neutral-300'
+                  }`}
+                >
+                  <span>COLECCIONES</span>
+                  {isCollectionsOpen ? (
+                    <ChevronUp className="w-4 h-4 text-neutral-400" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-neutral-400" />
+                  )}
+                </button>
+
+                {isCollectionsOpen && (
+                  <div className="pl-4 flex flex-col space-y-4 border-l border-white/5 mt-2">
+                    <Link
+                      href="/colecciones"
+                      onClick={() => setIsDrawerOpen(false)}
+                      className={`font-sans text-sm tracking-wider hover:text-brand-magenta transition-colors ${
+                        pathname === '/colecciones' ? 'text-brand-magenta font-bold' : 'text-neutral-400'
+                      }`}
+                    >
+                      VER TODAS
+                    </Link>
+
+                    {loadingCollections ? (
+                      <span className="text-[10px] text-neutral-500 font-mono tracking-widest animate-pulse">CARGANDO...</span>
+                    ) : collections.length === 0 ? (
+                      <span className="text-[10px] text-neutral-500 font-mono tracking-widest">SIN COLECCIONES ACTIVAS</span>
+                    ) : (
+                      collections.map((col) => {
+                        const isColActive = pathname === `/colecciones/${col.slug}`;
+                        return (
+                          <Link
+                            key={col.id}
+                            href={`/colecciones/${col.slug}`}
+                            onClick={() => setIsDrawerOpen(false)}
+                            className={`font-sans text-sm tracking-wider hover:text-brand-magenta transition-colors uppercase ${
+                              isColActive ? 'text-brand-magenta font-bold' : 'text-neutral-400'
+                            }`}
+                          >
+                            {col.name}
+                          </Link>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Tu Arsenal Link */}
+              <Link
+                href="/cart"
+                onClick={() => setIsDrawerOpen(false)}
+                className={`font-sans text-lg font-medium tracking-wider hover:text-brand-magenta transition-colors ${
+                  pathname === '/cart' ? 'text-brand-magenta font-bold border-l-2 border-brand-magenta pl-3' : 'text-neutral-300'
+                }`}
+              >
+                TU ARSENAL (CARRITO)
+              </Link>
 
               <div className="border-t border-white/5 pt-6 space-y-6">
                 {status === 'authenticated' ? (
@@ -226,9 +315,9 @@ const Navigation: React.FC = () => {
 
         {/* Tab 2: Exclusivo */}
         <Link
-          href="/colecciones/latin-pulse"
+          href={collections.length > 0 ? `/colecciones/${collections[0].slug}` : '/colecciones'}
           className={`flex flex-col items-center gap-1 transition-colors ${
-            pathname.includes('/colecciones/latin-pulse') ? 'text-brand-magenta' : 'text-neutral-400 hover:text-white'
+            pathname.includes('/colecciones/') ? 'text-brand-magenta' : 'text-neutral-400 hover:text-white'
           }`}
         >
           <Sparkles className="w-5 h-5" />

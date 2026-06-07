@@ -35,6 +35,8 @@ export interface AdminCollection {
   seoDescription?: string;
   seoKeywords?: string;
   imageAltText?: string;
+  isActive?: boolean;
+  sortOrder?: number;
 }
 
 export interface AdminProduct {

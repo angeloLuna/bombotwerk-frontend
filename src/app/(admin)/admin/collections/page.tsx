@@ -30,6 +30,8 @@ const EMPTY_FORM: Omit<AdminCollection, 'id' | '_count'> = {
   seoDescription: '',
   seoKeywords: '',
   imageAltText: '',
+  isActive: true,
+  sortOrder: 0,
 };
 
 export default function AdminCollectionsPage() {
@@ -151,6 +153,30 @@ export default function AdminCollectionsPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <div className="flex items-center gap-2 pt-4">
+                    <input
+                      type="checkbox"
+                      id={`edit-active-${editing.id}`}
+                      checked={editing.isActive ?? false}
+                      onChange={(e) => setEditing((prev: any) => ({ ...prev, isActive: e.target.checked }))}
+                      className="rounded border-white/10 bg-[#0f0f0f] text-brand-magenta focus:ring-0"
+                    />
+                    <label htmlFor={`edit-active-${editing.id}`} className="text-xs text-neutral-300 select-none cursor-pointer">
+                      Colección Activa (Visible en Menú)
+                    </label>
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-neutral-500 tracking-widest uppercase block mb-1">Orden de Visualización</label>
+                    <input
+                      type="number"
+                      className={inputCls}
+                      value={editing.sortOrder ?? 0}
+                      onChange={(e) => setEditing((prev: any) => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <ImageUploader
                     value={editing.coverImageUrl ?? ''}
@@ -234,7 +260,15 @@ export default function AdminCollectionsPage() {
     return (
       <tr className="hover:bg-white/[0.02] transition-colors group" key={c.id}>
         <td className="px-4 py-3.5">
-          <p className="text-xs font-semibold text-white">{c.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-white">{c.name}</p>
+            {c.isActive === false ? (
+              <span className="text-[8px] bg-red-500/10 border border-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-mono">OCULTA</span>
+            ) : (
+              <span className="text-[8px] bg-green-500/10 border border-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-mono">ACTIVA</span>
+            )}
+            <span className="text-[8px] bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded font-mono">ORDEN: {c.sortOrder ?? 0}</span>
+          </div>
           <p className="text-[10px] text-neutral-600 font-mono mt-0.5">{c.slug}</p>
         </td>
         <td className="px-4 py-3.5 hidden md:table-cell">
@@ -355,6 +389,30 @@ export default function AdminCollectionsPage() {
                   onChange={(e) => setNewForm((prev) => ({ ...prev, description: e.target.value }))}
                   placeholder="Collection description…"
                 />
+              </div>
+
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-white/5">
+                <div className="flex items-center gap-2 pt-4">
+                  <input
+                    type="checkbox"
+                    id="new-active"
+                    checked={newForm.isActive}
+                    onChange={(e) => setNewForm((prev) => ({ ...prev, isActive: e.target.checked }))}
+                    className="rounded border-white/10 bg-[#0f0f0f] text-brand-magenta focus:ring-0"
+                  />
+                  <label htmlFor="new-active" className="text-xs text-neutral-300 select-none cursor-pointer">
+                    Colección Activa (Visible en Menú)
+                  </label>
+                </div>
+                <div>
+                  <label className="text-[9px] text-neutral-500 tracking-widest uppercase block mb-1">Orden de Visualización</label>
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={newForm.sortOrder}
+                    onChange={(e) => setNewForm((prev) => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
               </div>
               <div className="md:col-span-2 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

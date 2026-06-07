@@ -247,6 +247,168 @@ export default function ProductDetailClient({ initialProduct: product, initialRe
     setTimeout(() => setAddedFeedback(false), 2000);
   };
 
+  const renderVariantSelector = () => {
+    return (
+      <div className="space-y-6">
+        {/* Availability */}
+        <div className="space-y-3 pt-2">
+          <div className="flex flex-col gap-2">
+            {selectedSize ? (
+              <AvailabilityBadge
+                type={getSelectedSizeAvailability(activeVariant, selectedSize).type}
+                text={getSelectedSizeAvailability(activeVariant, selectedSize).text}
+              />
+            ) : (
+              <AvailabilityBadge type={globalAvailability.type} text={globalAvailability.text} />
+            )}
+          </div>
+        </div>
+
+        {/* Color Selector widget (swatches) */}
+        {product.variants && product.variants.some((v) => !!v.color) && (
+          <div className="space-y-4 pt-4 border-t border-white/5">
+            <div className="flex justify-between items-center text-xs tracking-wider">
+              <span className="font-display font-bold text-neutral-400">SELECCIONAR COLOR</span>
+              {selectedColor && (
+                <span className="font-display font-black text-brand-magenta uppercase">
+                  {selectedColor}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {Array.from(
+                new Map(
+                  product.variants
+                    .filter((v) => !!v.color)
+                    .map((v) => [v.color!.toLowerCase(), v])
+                ).values()
+              ).map((variant) => {
+                const isColorActive = selectedColor === variant.color;
+                return (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedColor(variant.color || '');
+                      setErrorFeedback('');
+                      const firstSize = variant.stocks?.find((s) => s.quantity > 0)?.size || variant.stocks?.[0]?.size || '';
+                      if (firstSize) setSelectedSize(firstSize);
+                    }}
+                    className={`relative w-8 h-8 rounded-full border-2 transition-all duration-300 ${
+                      isColorActive
+                        ? 'border-brand-magenta scale-110 shadow-magenta-glow'
+                        : 'border-white/10 hover:border-white/30'
+                    }`}
+                    style={{
+                      backgroundColor: variant.colorHex || '#ffffff',
+                    }}
+                    title={variant.color || ''}
+                  >
+                    {!variant.colorHex && (
+                      <span className="absolute inset-0 flex items-center justify-center text-[8px] text-white uppercase font-bold px-0.5 truncate">
+                        {variant.color?.substring(0, 3)}
+                      </span>
+                    )}
+                    {isColorActive && (
+                      <span className="absolute -inset-1 rounded-full border border-brand-magenta animate-pulse" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Size Selector Widget */}
+        {product.sizes && product.sizes.length > 0 && (
+          <div className="space-y-4 pt-4 border-t border-white/5">
+            <div className="flex justify-between items-center text-xs tracking-wider">
+              <span className="font-display font-bold text-neutral-400">SELECCIONAR TALLA</span>
+              {selectedSize && (
+                <span className="font-display font-black text-brand-magenta">
+                  {selectedSize.toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {product.sizes.map((size) => {
+                const isActive = selectedSize === size;
+                const sizeStatus = getSizeStatus(activeVariant, size);
+                let statusClasses = '';
+                if (isActive) {
+                  statusClasses = 'bg-brand-magenta border-brand-magenta text-black shadow-magenta-glow font-black';
+                } else {
+                  if (sizeStatus === 'in_stock') {
+                    statusClasses = 'border-brand-magenta text-white bg-transparent hover:border-brand-magenta/80';
+                  } else if (sizeStatus === 'made_to_order') {
+                    statusClasses = 'border-dashed border-brand-magenta/40 text-white bg-transparent hover:border-brand-magenta/80';
+                  } else if (sizeStatus === 'out_of_stock') {
+                    statusClasses = 'border-white/10 text-neutral-600 bg-transparent';
+                  } else if (sizeStatus === 'discontinued') {
+                    statusClasses = 'border-white/10 text-neutral-600 bg-transparent opacity-50';
+                  }
+                }
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSize(size);
+                      setErrorFeedback('');
+                      const maxQty = getProductMaxQty(activeVariant, size);
+                      setQuantity((prev) => Math.min(maxQty, prev));
+                    }}
+                    className={`min-w-[60px] h-[48px] border text-xs font-display font-black tracking-widest transition-all duration-300 ${statusClasses}`}
+                  >
+                    {size}
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedSize && (() => {
+              const status = getSizeStatus(activeVariant, selectedSize);
+              const minDays = activeVariant?.madeToOrderMinDays ?? 7;
+              const maxDays = activeVariant?.madeToOrderMaxDays ?? 9;
+
+              if (status === 'made_to_order') {
+                return (
+                  <div className="flex gap-2 items-center text-xs text-neutral-300 font-sans pt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-magenta animate-pulse shrink-0" />
+                    <p>
+                      Disponible bajo pedido. Fabricación de <span className="font-bold text-white">{minDays} a {maxDays} días hábiles</span>.
+                    </p>
+                  </div>
+                );
+              }
+              if (status === 'out_of_stock') {
+                return (
+                  <div className="flex gap-2 items-center text-xs text-neutral-400 font-sans pt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 shrink-0" />
+                    <p>Esta talla no está disponible por ahora.</p>
+                  </div>
+                );
+              }
+              if (status === 'discontinued') {
+                return (
+                  <div className="flex gap-2 items-center text-xs text-neutral-500 font-sans pt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-700 shrink-0" />
+                    <p>Esta talla ya no está disponible.</p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {errorFeedback && <p className="text-xs text-red-500 font-sans font-bold">{errorFeedback}</p>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const currentImageUrl = images[activeImageIndex] ?? images[0];
   const currentImageObj = product.rawImages?.find((img) => img.url === currentImageUrl);
   const currentImageType = currentImageObj?.type || 'catalog';
@@ -325,6 +487,11 @@ export default function ProductDetailClient({ initialProduct: product, initialRe
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Mobile Variant Selector (immediately after the gallery/carousel) */}
+          <div className="block md:hidden bg-brand-charcoal/20 border border-white/5 p-4 rounded-xl mt-4">
+            {renderVariantSelector()}
           </div>
 
           {/* Desktop Navigable Gallery (hidden md:block) */}
@@ -422,161 +589,10 @@ export default function ProductDetailClient({ initialProduct: product, initialRe
             </div>
           </div>
 
-          {/* Availability */}
-          <div className="space-y-3 pt-2">
-            <div className="flex flex-col gap-2">
-              {selectedSize ? (
-                <AvailabilityBadge
-                  type={getSelectedSizeAvailability(activeVariant, selectedSize).type}
-                  text={getSelectedSizeAvailability(activeVariant, selectedSize).text}
-                />
-              ) : (
-                <AvailabilityBadge type={globalAvailability.type} text={globalAvailability.text} />
-              )}
-            </div>
+          {/* Variant Selector (Desktop view only) */}
+          <div className="hidden md:block">
+            {renderVariantSelector()}
           </div>
-
-          {/* Color Selector widget (swatches) */}
-          {product.variants && product.variants.some((v) => !!v.color) && (
-            <div className="space-y-4 pt-4 border-t border-white/5">
-              <div className="flex justify-between items-center text-xs tracking-wider">
-                <span className="font-display font-bold text-neutral-400">SELECCIONAR COLOR</span>
-                {selectedColor && (
-                  <span className="font-display font-black text-brand-magenta uppercase">
-                    {selectedColor}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {Array.from(
-                  new Map(
-                    product.variants
-                      .filter((v) => !!v.color)
-                      .map((v) => [v.color!.toLowerCase(), v])
-                  ).values()
-                ).map((variant) => {
-                  const isColorActive = selectedColor === variant.color;
-                  return (
-                    <button
-                      key={variant.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedColor(variant.color || '');
-                        setErrorFeedback('');
-                        const firstSize = variant.stocks?.find((s) => s.quantity > 0)?.size || variant.stocks?.[0]?.size || '';
-                        if (firstSize) setSelectedSize(firstSize);
-                      }}
-                      className={`relative w-8 h-8 rounded-full border-2 transition-all duration-300 ${
-                        isColorActive
-                          ? 'border-brand-magenta scale-110 shadow-magenta-glow'
-                          : 'border-white/10 hover:border-white/30'
-                      }`}
-                      style={{
-                        backgroundColor: variant.colorHex || '#ffffff',
-                      }}
-                      title={variant.color || ''}
-                    >
-                      {!variant.colorHex && (
-                        <span className="absolute inset-0 flex items-center justify-center text-[8px] text-white uppercase font-bold px-0.5 truncate">
-                          {variant.color?.substring(0, 3)}
-                        </span>
-                      )}
-                      {isColorActive && (
-                        <span className="absolute -inset-1 rounded-full border border-brand-magenta animate-pulse" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Size Selector Widget */}
-          {product.sizes && product.sizes.length > 0 && (
-            <div className="space-y-4 pt-4 border-t border-white/5">
-              <div className="flex justify-between items-center text-xs tracking-wider">
-                <span className="font-display font-bold text-neutral-400">SELECCIONAR TALLA</span>
-                {selectedSize && (
-                  <span className="font-display font-black text-brand-magenta">
-                    {selectedSize.toUpperCase()}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {product.sizes.map((size) => {
-                  const isActive = selectedSize === size;
-                  const sizeStatus = getSizeStatus(activeVariant, size);
-                  let statusClasses = '';
-                  if (isActive) {
-                    statusClasses = 'bg-brand-magenta border-brand-magenta text-black shadow-magenta-glow font-black';
-                  } else {
-                    if (sizeStatus === 'in_stock') {
-                      statusClasses = 'border-brand-magenta text-white bg-transparent hover:border-brand-magenta/80';
-                    } else if (sizeStatus === 'made_to_order') {
-                      statusClasses = 'border-dashed border-brand-magenta/40 text-white bg-transparent hover:border-brand-magenta/80';
-                    } else if (sizeStatus === 'out_of_stock') {
-                      statusClasses = 'border-white/10 text-neutral-600 bg-transparent';
-                    } else if (sizeStatus === 'discontinued') {
-                      statusClasses = 'border-white/10 text-neutral-600 bg-transparent opacity-50';
-                    }
-                  }
-                  return (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => {
-                        setSelectedSize(size);
-                        setErrorFeedback('');
-                        const maxQty = getProductMaxQty(activeVariant, size);
-                        setQuantity((prev) => Math.min(maxQty, prev));
-                      }}
-                      className={`min-w-[60px] h-[48px] border text-xs font-display font-black tracking-widest transition-all duration-300 ${statusClasses}`}
-                    >
-                      {size}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {selectedSize && (() => {
-                const status = getSizeStatus(activeVariant, selectedSize);
-                const minDays = activeVariant?.madeToOrderMinDays ?? 7;
-                const maxDays = activeVariant?.madeToOrderMaxDays ?? 9;
-
-                if (status === 'made_to_order') {
-                  return (
-                    <div className="flex gap-2 items-center text-xs text-neutral-300 font-sans pt-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-brand-magenta animate-pulse shrink-0" />
-                      <p>
-                        Disponible bajo pedido. Fabricación de <span className="font-bold text-white">{minDays} a {maxDays} días hábiles</span>.
-                      </p>
-                    </div>
-                  );
-                }
-                if (status === 'out_of_stock') {
-                  return (
-                    <div className="flex gap-2 items-center text-xs text-neutral-400 font-sans pt-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 shrink-0" />
-                      <p>Esta talla no está disponible por ahora.</p>
-                    </div>
-                  );
-                }
-                if (status === 'discontinued') {
-                  return (
-                    <div className="flex gap-2 items-center text-xs text-neutral-500 font-sans pt-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-neutral-700 shrink-0" />
-                      <p>Esta talla ya no está disponible.</p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
-              {errorFeedback && <p className="text-xs text-red-500 font-sans font-bold">{errorFeedback}</p>}
-            </div>
-          )}
 
           {/* Quantity Selector Widget */}
           <div className="space-y-3 pt-4 border-t border-white/5">
