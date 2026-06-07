@@ -1,6 +1,41 @@
+import { getSession } from 'next-auth/react';
+
 declare global {
   interface Window {
     dataLayer?: Record<string, unknown>[];
+  }
+}
+
+async function sendActivityLog(
+  eventType: string,
+  data?: { productId?: string; orderId?: string; guestEmail?: string; metadata?: any },
+) {
+  if (typeof window === 'undefined') return;
+  try {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:4000';
+    const headers: any = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
+
+    const session = await getSession();
+    if (session && (session as any).backendToken) {
+      headers['Authorization'] = `Bearer ${(session as any).backendToken}`;
+    }
+
+    await fetch(`${backendUrl}/api/activity-logs`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        eventType,
+        productId: data?.productId,
+        orderId: data?.orderId,
+        guestEmail: data?.guestEmail,
+        metadata: data?.metadata || {},
+      }),
+    });
+  } catch (error) {
+    console.error('[sendActivityLog] Failed to log activity:', error);
   }
 }
 
@@ -34,6 +69,15 @@ export function trackViewItem(product: { id: string; name: string; price: number
       ]
     }
   });
+
+  sendActivityLog('view_product', {
+    productId: product.id,
+    metadata: {
+      name: product.name,
+      price: product.price,
+      category: product.category || '',
+    },
+  });
 }
 
 /**
@@ -61,6 +105,16 @@ export function trackAddToCart(
       ]
     }
   });
+
+  sendActivityLog('add_to_cart', {
+    productId: product.id,
+    metadata: {
+      name: product.name,
+      price: product.price,
+      size,
+      quantity,
+    },
+  });
 }
 
 /**
@@ -86,6 +140,20 @@ export function trackBeginCheckout(
         };
       })
     }
+  });
+
+  sendActivityLog('begin_checkout', {
+    metadata: {
+      totalValue,
+      itemIds: items.map((i) => i.product.id),
+      items: items.map((i) => ({
+        productId: i.product.id,
+        name: i.product.name,
+        size: i.selectedSize,
+        quantity: i.quantity,
+        price: i.product.price,
+      })),
+    },
   });
 }
 
@@ -163,4 +231,8 @@ export function trackSignUp(method: string) {
  */
 export function trackWhatsAppClick(location: string) {
   pushToDataLayer("whatsapp_click", { location });
+
+  sendActivityLog('whatsapp_clicked', {
+    metadata: { location },
+  });
 }

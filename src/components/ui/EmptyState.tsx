@@ -7,6 +7,7 @@ interface EmptyStateProps {
   message?: string;
   actionLabel?: string;
   actionHref?: string;
+  onClick?: () => void;
 }
 
 /**
@@ -17,6 +18,7 @@ export default function EmptyState({
   message = 'Esta sección no tiene artículos por el momento. Vuelve pronto.',
   actionLabel,
   actionHref,
+  onClick,
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[40vh] gap-6 py-16 px-4 text-center">
@@ -36,13 +38,24 @@ export default function EmptyState({
       </div>
 
       {/* Optional action */}
-      {actionLabel && actionHref && (
-        <Link
-          href={actionHref}
-          className="text-[10px] tracking-widest font-display font-black text-brand-magenta border-b border-brand-magenta/40 pb-1 hover:border-brand-magenta transition-colors"
-        >
-          {actionLabel} →
-        </Link>
+      {actionLabel && (actionHref || onClick) && (
+        actionHref ? (
+          <Link
+            href={actionHref}
+            onClick={onClick}
+            className="text-[10px] tracking-widest font-display font-black text-brand-magenta border-b border-brand-magenta/40 pb-1 hover:border-brand-magenta transition-colors"
+          >
+            {actionLabel} →
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={onClick}
+            className="text-[10px] tracking-widest font-display font-black text-brand-magenta border-b border-brand-magenta/40 pb-1 hover:border-brand-magenta transition-colors focus:outline-none"
+          >
+            {actionLabel} →
+          </button>
+        )
       )}
     </div>
   );

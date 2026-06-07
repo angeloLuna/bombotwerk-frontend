@@ -265,6 +265,55 @@ export interface AdminPayment {
   rawResponse?: any;
 }
 
+export interface AdminOrderNote {
+  id: string;
+  content: string;
+  createdAt: string;
+  adminUser?: {
+    name: string | null;
+    email: string;
+    image: string | null;
+  } | null;
+}
+
+export interface AdminDashboardSummary {
+  sales: {
+    today: number;
+    month: number;
+  };
+  orders: {
+    total: number;
+    paid: number;
+    pending: number;
+    failedCancelled: number;
+    toPrepare: number;
+    madeToOrder: number;
+    mixed: number;
+  };
+  inventory: {
+    outOfStock: number;
+    lowStock: number;
+    madeToOrderActive: number;
+  };
+  latestUsers: Array<{
+    id: string;
+    email: string;
+    name: string | null;
+    createdAt: string;
+    role: string;
+  }>;
+  latestOrders: Array<{
+    id: string;
+    orderNumber: string;
+    customerEmail: string;
+    customerName: string | null;
+    total: number;
+    status: string;
+    fulfillmentStatus: string;
+    createdAt: string;
+  }>;
+}
+
 export interface AdminOrder {
   id: string;
   orderNumber: string;
@@ -275,6 +324,7 @@ export interface AdminOrder {
   billingAddress?: string | null;
   shippingMethod?: string | null;
   status: string;
+  fulfillmentStatus: string;
   subtotal: number;
   shippingTotal: number;
   total: number;
@@ -304,9 +354,108 @@ export interface AdminOrder {
   fulfillmentNotes?: string | null;
   shippingNotes?: string | null;
 
+  // Shipping tracking fields
+  carrier?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+
+  // Internal Notes
+  notes?: AdminOrderNote[];
+
   // Email confirmation control fields
   confirmationEmailSentAt?: string | null;
   confirmationEmailStatus?: string | null;
   confirmationEmailError?: string | null;
+}
+
+export interface AdminUser {
+  email: string;
+  name: string | null;
+  userId: string | null;
+  customerId: string | null;
+  userType: 'admin' | 'registered' | 'guest';
+  createdAt: string | null;
+  orderCount: number;
+  totalSpent: number;
+  averageTicket: number;
+  lastOrderDate: string | null;
+  lastActivity: string | null;
+}
+
+export interface AdminUserDetail {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  userType: 'admin' | 'registered' | 'guest';
+  createdAt: string | null;
+  lastActivity: string | null;
+  provider: string | null;
+  image: string | null;
+  metrics: {
+    orderCount: number;
+    totalSpent: number;
+    averageTicket: number;
+  };
+  orders: Array<{
+    id: string;
+    orderNumber: string;
+    createdAt: string;
+    total: number;
+    status: string;
+    paymentStatus: string;
+  }>;
+  productsBought: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    size: string;
+    unitPrice: number;
+  }>;
+  shippingAddresses: string[];
+  activityLogs: Array<{
+    id: string;
+    eventType: string;
+    metadata: any;
+    createdAt: string;
+  }>;
+}
+
+export interface AdminActivityLog {
+  id: string;
+  userId: string | null;
+  guestEmail: string | null;
+  orderId: string | null;
+  productId: string | null;
+  eventType: string;
+  metadata: any;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  adminUserId: string;
+  adminUser: {
+    id: string;
+    name: string | null;
+    email: string;
+    image: string | null;
+  };
+  action: string;
+  entityType: string;
+  entityId: string;
+  before: any;
+  after: any;
+  metadata: any;
+  createdAt: string;
 }
 

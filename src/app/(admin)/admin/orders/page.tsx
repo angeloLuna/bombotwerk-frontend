@@ -26,6 +26,8 @@ export default function AdminOrdersPage() {
 
   // Filter States
   const [status, setStatus] = useState('');
+  const [fulfillmentStatus, setFulfillmentStatus] = useState('');
+  const [fulfillmentPreset, setFulfillmentPreset] = useState('');
   const [email, setEmail] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -37,6 +39,8 @@ export default function AdminOrdersPage() {
     try {
       const data = await adminApi.orders.list({
         status: status || undefined,
+        fulfillmentStatus: fulfillmentStatus || undefined,
+        fulfillmentPreset: fulfillmentPreset || undefined,
         email: email || undefined,
         orderNumber: orderNumber || undefined,
         startDate: startDate || undefined,
@@ -48,11 +52,11 @@ export default function AdminOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [status, email, orderNumber, startDate, endDate]);
+  }, [status, fulfillmentStatus, fulfillmentPreset, email, orderNumber, startDate, endDate]);
 
   useEffect(() => {
     loadOrders();
-  }, [status, startDate, endDate]); // Trigger auto-reload when status or date range changes
+  }, [status, fulfillmentStatus, fulfillmentPreset, startDate, endDate]); // Trigger auto-reload when filters change
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +65,8 @@ export default function AdminOrdersPage() {
 
   const handleClearFilters = () => {
     setStatus('');
+    setFulfillmentStatus('');
+    setFulfillmentPreset('');
     setEmail('');
     setOrderNumber('');
     setStartDate('');
@@ -103,6 +109,29 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const getFulfillmentBadge = (fStatus: string) => {
+    let colorClass = 'text-neutral-400 bg-white/5 border-white/10';
+    let text = (fStatus || 'pending_review').replace('_', ' ').toUpperCase();
+
+    if (fStatus === 'shipped' || fStatus === 'delivered') {
+      colorClass = 'text-green-400 bg-green-400/10 border-green-500/20';
+    } else if (fStatus === 'preparing' || fStatus === 'in_production') {
+      colorClass = 'text-brand-magenta bg-brand-magenta/10 border-brand-magenta/20';
+    } else if (fStatus === 'ready_to_ship' || fStatus === 'paid') {
+      colorClass = 'text-brand-gold bg-brand-gold/10 border-brand-gold/20';
+    } else if (fStatus === 'cancelled' || fStatus === 'refunded') {
+      colorClass = 'text-red-400 bg-red-400/10 border-red-500/20';
+    } else if (fStatus === 'pending_review') {
+      colorClass = 'text-cyan-400 bg-cyan-400/10 border-cyan-500/20';
+    }
+
+    return (
+      <span className={`inline-flex items-center text-[9px] font-display font-bold px-2 py-0.5 rounded-full border ${colorClass}`}>
+        {text}
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6 text-left">
       {/* Page Header */}
@@ -126,7 +155,7 @@ export default function AdminOrdersPage() {
 
       {/* Filters Form */}
       <form onSubmit={handleSearchSubmit} className="bg-brand-charcoal border border-white/5 p-4 rounded-xl space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Order Number */}
           <div className="space-y-1">
             <label className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold block">Orden</label>
@@ -164,6 +193,44 @@ export default function AdminOrdersPage() {
               <option value="pending">PENDIENTE</option>
               <option value="failed">RECHAZADO</option>
               <option value="cancelled">CANCELADO</option>
+            </select>
+          </div>
+
+          {/* Preset Filters */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold block">Filtros Rápidos (Fulfillment)</label>
+            <select
+              value={fulfillmentPreset}
+              onChange={(e) => setFulfillmentPreset(e.target.value)}
+              className="w-full bg-[#141416] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-magenta/40 appearance-none"
+            >
+              <option value="">TODOS</option>
+              <option value="pending_prepare">PENDIENTES DE PREPARAR (PAGADOS)</option>
+              <option value="in_production">EN FABRICACIÓN</option>
+              <option value="ready_to_ship">LISTOS PARA ENVIAR</option>
+              <option value="shipped">ENVIADOS</option>
+              <option value="cancelled">CANCELADOS</option>
+            </select>
+          </div>
+
+          {/* Operational Status (Fulfillment Status) */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold block">Estado Operativo</label>
+            <select
+              value={fulfillmentStatus}
+              onChange={(e) => setFulfillmentStatus(e.target.value)}
+              className="w-full bg-[#141416] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-magenta/40 appearance-none"
+            >
+              <option value="">TODOS</option>
+              <option value="pending_review">PENDIENTE DE REVISIÓN</option>
+              <option value="paid">PAGADO / RECIBIDO</option>
+              <option value="preparing">PREPARANDO</option>
+              <option value="in_production">EN FABRICACIÓN</option>
+              <option value="ready_to_ship">LISTO PARA ENVIAR</option>
+              <option value="shipped">ENVIADO</option>
+              <option value="delivered">ENTREGADO</option>
+              <option value="cancelled">CANCELADO</option>
+              <option value="refunded">REEMBOLSADO</option>
             </select>
           </div>
 
@@ -230,17 +297,18 @@ export default function AdminOrdersPage() {
           title="SIN ÓRDENES REGISTRADAS"
           message="No se encontraron órdenes ni transacciones que coincidan con los filtros seleccionados."
           actionLabel="VER TODAS LAS ÓRDENES"
-          actionHref="#"
+          actionHref="/admin/orders"
         />
       ) : (
         <div className="rounded-xl border border-white/5 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[700px]">
+            <table className="w-full text-sm min-w-[950px]">
               <thead>
                 <tr className="bg-white/[0.03] border-b border-white/5 text-[10px] tracking-widest text-neutral-500 font-display font-bold">
                   <th className="text-left px-4 py-3">ORDEN</th>
                   <th className="text-left px-4 py-3">CLIENTE</th>
                   <th className="text-center px-4 py-3">ESTADO PAGO</th>
+                  <th className="text-center px-4 py-3">ESTADO OPERATIVO</th>
                   <th className="text-right px-4 py-3">TOTAL</th>
                   <th className="text-left px-4 py-3">MÉTODO PAGO</th>
                   <th className="text-left px-4 py-3">FECHA</th>
@@ -266,6 +334,11 @@ export default function AdminOrdersPage() {
                     {/* Status badge */}
                     <td className="px-4 py-3.5 text-center">
                       {getStatusBadge(order.status)}
+                    </td>
+
+                    {/* Fulfillment Status badge */}
+                    <td className="px-4 py-3.5 text-center">
+                      {getFulfillmentBadge(order.fulfillmentStatus)}
                     </td>
 
                     {/* Total paid */}

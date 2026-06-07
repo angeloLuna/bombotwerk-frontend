@@ -21,6 +21,9 @@ import {
   FileCode,
   Mail,
   Check,
+  MessageSquare,
+  Truck,
+  Edit,
 } from 'lucide-react';
 
 interface OrderDetailPageProps {
@@ -55,15 +58,123 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
   const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
 
+  // Status update states
+  const [statusUpdate, setStatusUpdate] = useState<string>('');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingStatusMsg, setUpdatingStatusMsg] = useState<string | null>(null);
+
+  // Fulfillment update states
+  const [fulfillmentUpdate, setFulfillmentUpdate] = useState<string>('');
+  const [updatingFulfillment, setUpdatingFulfillment] = useState(false);
+  const [updatingFulfillmentMsg, setUpdatingFulfillmentMsg] = useState<string | null>(null);
+
+  // Shipping form states
+  const [carrier, setCarrier] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
+  const [shippedAt, setShippedAt] = useState('');
+  const [updatingShipping, setUpdatingShipping] = useState(false);
+  const [updatingShippingMsg, setUpdatingShippingMsg] = useState<string | null>(null);
+
+  // Notes state
+  const [noteContent, setNoteContent] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
+  const [addingNoteMsg, setAddingNoteMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     adminApi.orders
       .get(id)
-      .then((data) => setOrder(data))
+      .then((data) => {
+        setOrder(data);
+        setStatusUpdate(data.status);
+        setFulfillmentUpdate(data.fulfillmentStatus || 'pending_review');
+        setCarrier(data.carrier || '');
+        setTrackingNumber(data.trackingNumber || '');
+        setTrackingUrl(data.trackingUrl || '');
+        setShippedAt(data.shippedAt ? new Date(data.shippedAt).toISOString().split('T')[0] : '');
+      })
       .catch((e) => setError(e.message ?? 'Error al cargar el detalle de la orden.'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleUpdateStatus = async () => {
+    if (!order) return;
+    setUpdatingStatus(true);
+    setUpdatingStatusMsg(null);
+    try {
+      await adminApi.orders.updateStatus(order.id, statusUpdate);
+      setUpdatingStatusMsg('Estado actualizado con éxito.');
+      const updated = await adminApi.orders.get(order.id);
+      setOrder(updated);
+    } catch (err: any) {
+      setUpdatingStatusMsg(err.message || 'Error al actualizar el estado.');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleUpdateFulfillment = async () => {
+    if (!order) return;
+    setUpdatingFulfillment(true);
+    setUpdatingFulfillmentMsg(null);
+    try {
+      await adminApi.orders.updateFulfillmentStatus(order.id, fulfillmentUpdate);
+      setUpdatingFulfillmentMsg('Estado operativo actualizado con éxito.');
+      const updated = await adminApi.orders.get(order.id);
+      setOrder(updated);
+    } catch (err: any) {
+      setUpdatingFulfillmentMsg(err.message || 'Error al actualizar el estado operativo.');
+    } finally {
+      setUpdatingFulfillment(false);
+    }
+  };
+
+  const handleUpdateShipping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!order) return;
+    if (!carrier || !trackingNumber) {
+      setUpdatingShippingMsg('Paquetería y número de guía son obligatorios.');
+      return;
+    }
+    setUpdatingShipping(true);
+    setUpdatingShippingMsg(null);
+    try {
+      await adminApi.orders.updateShipping(order.id, {
+        carrier,
+        trackingNumber,
+        trackingUrl,
+        shippedAt: shippedAt || undefined,
+      });
+      setUpdatingShippingMsg('Datos de envío registrados.');
+      const updated = await adminApi.orders.get(order.id);
+      setOrder(updated);
+      setFulfillmentUpdate(updated.fulfillmentStatus);
+    } catch (err: any) {
+      setUpdatingShippingMsg(err.message || 'Error al actualizar datos de envío.');
+    } finally {
+      setUpdatingShipping(false);
+    }
+  };
+
+  const handleAddNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!order || !noteContent.trim()) return;
+    setAddingNote(true);
+    setAddingNoteMsg(null);
+    try {
+      await adminApi.orders.addNote(order.id, noteContent.trim());
+      setNoteContent('');
+      setAddingNoteMsg('Nota agregada con éxito.');
+      const updated = await adminApi.orders.get(order.id);
+      setOrder(updated);
+    } catch (err: any) {
+      setAddingNoteMsg(err.message || 'Error al guardar la nota.');
+    } finally {
+      setAddingNote(false);
+    }
+  };
 
   const handleResendEmail = async () => {
     if (!order) return;
@@ -146,6 +257,21 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
           desc: 'El pedido fue cancelado de forma manual o por expirar el plazo de pago.',
         };
     }
+  };
+
+  const getFulfillmentLabel = (fStatus: string) => {
+    const map: Record<string, string> = {
+      pending_review: 'Pendiente de Revisión',
+      paid: 'Pagado / Recibido',
+      preparing: 'Preparando',
+      in_production: 'En Fabricación',
+      ready_to_ship: 'Listo para Enviar',
+      shipped: 'Enviado',
+      delivered: 'Entregado',
+      cancelled: 'Cancelado',
+      refunded: 'Reembolsado',
+    };
+    return map[fStatus] || fStatus;
   };
 
   const statusInfo = getStatusDetails(order.status);
@@ -263,6 +389,28 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                     </span>
                   </div>
                 </div>
+
+                {/* Tracking status snapshot if shipped */}
+                {order.carrier && (
+                  <div className="bg-black/20 border border-white/5 p-3 rounded-lg grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Paquetería / Guía</span>
+                      <span className="text-white uppercase font-bold">{order.carrier}</span> · <span className="font-mono text-neutral-300">{order.trackingNumber}</span>
+                    </div>
+                    {order.trackingUrl && (
+                      <div className="sm:text-right self-center">
+                        <a
+                          href={order.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] tracking-widest font-display font-bold text-brand-magenta border-b border-brand-magenta/40 hover:border-brand-magenta transition-colors"
+                        >
+                          RASTREAR ENVÍO →
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="border-t border-white/5 pt-3 space-y-2">
                   <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Composición del Carrito</span>
@@ -420,6 +568,223 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
         {/* Right Column (5 Cols) */}
         <div className="lg:col-span-5 space-y-6">
           
+          {/* Internal Notes Card */}
+          <div className="bg-brand-charcoal border border-white/5 p-5 rounded-xl space-y-4">
+            <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-brand-magenta" />
+              NOTAS INTERNAS DE LA ORDEN
+            </h3>
+
+            {/* List notes */}
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              {!order.notes || order.notes.length === 0 ? (
+                <p className="text-xs text-neutral-500 italic py-2">Sin notas internas registradas para este pedido.</p>
+              ) : (
+                order.notes.map((note) => (
+                  <div key={note.id} className="bg-black/20 border border-white/5 p-3 rounded-lg text-xs space-y-1.5">
+                    <div className="flex items-center justify-between text-[9px] text-neutral-500">
+                      <span className="font-bold uppercase text-white truncate max-w-[120px]">{note.adminUser?.name || 'Admin'}</span>
+                      <span className="font-mono">{new Date(note.createdAt).toLocaleString('es-MX', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <p className="text-neutral-300 font-sans leading-relaxed break-words whitespace-pre-wrap">{note.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add note form */}
+            <form onSubmit={handleAddNote} className="space-y-3 border-t border-white/5 pt-3">
+              <textarea
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                placeholder="Escribe una nota interna (ej. Cliente solicitó cambio de talla por WhatsApp)..."
+                rows={3}
+                className="w-full bg-[#141416] border border-white/5 rounded px-2.5 py-1.5 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-brand-magenta/40"
+              />
+              {addingNoteMsg && (
+                <div className={`p-2 rounded text-[10px] ${addingNoteMsg.includes('éxito') ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                  {addingNoteMsg}
+                </div>
+              )}
+              <Button
+                type="submit"
+                variant="secondary"
+                fullWidth
+                size="sm"
+                disabled={addingNote || !noteContent.trim()}
+                className="text-[9px] tracking-widest font-display font-bold uppercase py-1.5"
+              >
+                {addingNote ? 'GUARDANDO...' : 'AÑADIR NOTA INTERNA'}
+              </Button>
+            </form>
+          </div>
+
+          {/* Operational Fulfillment Status Control Card */}
+          <div className="bg-brand-charcoal border border-white/5 p-5 rounded-xl space-y-4">
+            <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2 flex items-center gap-2">
+              <Edit className="w-4 h-4 text-brand-magenta" />
+              ESTADO OPERATIVO (FULFILLMENT)
+            </h3>
+            <div className="text-xs space-y-3">
+              <div className="space-y-1">
+                <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Estado actual:</span>
+                <span className="text-brand-magenta font-mono uppercase font-bold text-[10px] bg-brand-magenta/10 border border-brand-magenta/20 px-2 py-0.5 rounded-full inline-block">
+                  {getFulfillmentLabel(order.fulfillmentStatus)}
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Cambiar estado operativo a:</label>
+                <select
+                  value={fulfillmentUpdate}
+                  onChange={(e) => setFulfillmentUpdate(e.target.value)}
+                  className="w-full bg-[#141416] border border-white/5 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-magenta/40"
+                >
+                  <option value="pending_review">PENDIENTE DE REVISIÓN</option>
+                  <option value="paid">PAGADO / RECIBIDO</option>
+                  <option value="preparing">PREPARANDO</option>
+                  <option value="in_production">EN FABRICACIÓN</option>
+                  <option value="ready_to_ship">LISTO PARA ENVIAR</option>
+                  <option value="shipped">ENVIADO</option>
+                  <option value="delivered">ENTREGADO</option>
+                  <option value="cancelled">CANCELADO</option>
+                  <option value="refunded">REEMBOLSADO</option>
+                </select>
+              </div>
+
+              {updatingFulfillmentMsg && (
+                <div className={`p-2 rounded text-[10px] ${updatingFulfillmentMsg.includes('éxito') ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                  {updatingFulfillmentMsg}
+                </div>
+              )}
+
+              <Button
+                variant="primary"
+                fullWidth
+                size="sm"
+                onClick={handleUpdateFulfillment}
+                disabled={updatingFulfillment || fulfillmentUpdate === order.fulfillmentStatus}
+                className="text-[10px] tracking-widest font-display font-black uppercase flex items-center justify-center gap-1.5 py-2"
+              >
+                {updatingFulfillment ? 'ACTUALIZANDO...' : 'ACTUALIZAR ESTADO OPERATIVO'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Shipping & Tracking capture Card */}
+          <div className="bg-brand-charcoal border border-white/5 p-5 rounded-xl space-y-4">
+            <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2 flex items-center gap-2">
+              <Truck className="w-4 h-4 text-brand-magenta" />
+              REGISTRAR GUÍA DE ENVÍO
+            </h3>
+            <form onSubmit={handleUpdateShipping} className="text-xs space-y-3 font-sans">
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Paquetería</label>
+                <input
+                  type="text"
+                  placeholder="e.g. DHL, FedEx, Estafeta"
+                  value={carrier}
+                  onChange={(e) => setCarrier(e.target.value)}
+                  className="w-full bg-[#141416] border border-white/5 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-magenta/40"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Número de Guía</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 1234567890"
+                  value={trackingNumber}
+                  onChange={(e) => setTrackingNumber(e.target.value)}
+                  className="w-full bg-[#141416] border border-white/5 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-magenta/40"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">URL de Rastreo (Opcional)</label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://www.dhl.com/track..."
+                  value={trackingUrl}
+                  onChange={(e) => setTrackingUrl(e.target.value)}
+                  className="w-full bg-[#141416] border border-white/5 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-magenta/40"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Fecha de Envío</label>
+                <input
+                  type="date"
+                  value={shippedAt}
+                  onChange={(e) => setShippedAt(e.target.value)}
+                  className="w-full bg-[#141416] border border-white/5 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-magenta/40"
+                />
+              </div>
+
+              {updatingShippingMsg && (
+                <div className={`p-2 rounded text-[10px] ${updatingShippingMsg.includes('registrados') ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                  {updatingShippingMsg}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                variant="primary"
+                fullWidth
+                size="sm"
+                disabled={updatingShipping}
+                className="shadow-magenta-glow text-[10px] tracking-widest font-display font-black uppercase py-2"
+              >
+                {updatingShipping ? 'GUARDANDO...' : 'REGISTRAR GUÍA Y MARCAR ENVIADO'}
+              </Button>
+            </form>
+          </div>
+
+          {/* Order Payment Status Control Card */}
+          <div className="bg-brand-charcoal border border-white/5 p-5 rounded-xl space-y-4">
+            <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2 flex items-center gap-2">
+              <History className="w-4 h-4 text-brand-magenta" />
+              ESTADO DE PAGO (CAJA)
+            </h3>
+            <div className="text-xs space-y-3">
+              <div className="space-y-1">
+                <span className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Estado actual:</span>
+                <span className="text-white font-mono uppercase font-bold">{order.status}</span>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider block">Cambiar estado de pago a:</label>
+                <select
+                  value={statusUpdate}
+                  onChange={(e) => setStatusUpdate(e.target.value)}
+                  className="w-full bg-[#141416] border border-white/5 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-magenta/40"
+                >
+                  <option value="pending">PENDIENTE</option>
+                  <option value="paid">PAGADO (APROBADO)</option>
+                  <option value="failed">FALLIDO (RECHAZADO)</option>
+                  <option value="cancelled">CANCELADO</option>
+                </select>
+              </div>
+
+              {updatingStatusMsg && (
+                <div className={`p-2 rounded text-[10px] ${updatingStatusMsg.includes('éxito') ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                  {updatingStatusMsg}
+                </div>
+              )}
+
+              <Button
+                variant="primary"
+                fullWidth
+                size="sm"
+                onClick={handleUpdateStatus}
+                disabled={updatingStatus || statusUpdate === order.status}
+                className="text-[10px] tracking-widest font-display font-black uppercase flex items-center justify-center gap-1.5 py-2"
+              >
+                {updatingStatus ? 'ACTUALIZANDO...' : 'ACTUALIZAR ESTADO DE PAGO'}
+              </Button>
+            </div>
+          </div>
+
           {/* A. Payment Details Card */}
           <div className="bg-brand-charcoal border border-white/5 p-5 rounded-xl space-y-4">
             <h3 className="text-xs tracking-widest font-display text-neutral-400 font-bold border-b border-white/5 pb-2 flex items-center gap-2">
@@ -529,7 +894,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 <div className="bg-red-500/5 border border-red-500/10 p-3 rounded-lg space-y-1">
                   <span className="text-[9px] text-red-400 font-bold uppercase tracking-wider block">Último Error Registrado:</span>
                   <p className="text-[10px] text-neutral-400 font-mono break-all leading-normal">
-                    {order.confirmationEmailError}
+                     {order.confirmationEmailError}
                   </p>
                 </div>
               )}
